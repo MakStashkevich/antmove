@@ -152,5 +152,17 @@ func ensureShellPath(home, binDirectory string) (bool, error) {
 }
 
 func autoInstallOnFirstRun(command string) bool {
-	return command != "install" && command != "uninstall"
+	if command == "install" || command == "uninstall" {
+		return false
+	}
+	executable, err := os.Executable()
+	if err == nil {
+		if resolved, resolveErr := filepath.EvalSymlinks(executable); resolveErr == nil {
+			executable = resolved
+		}
+		if strings.Contains(filepath.ToSlash(executable), "/Cellar/antmove/") {
+			return false
+		}
+	}
+	return true
 }

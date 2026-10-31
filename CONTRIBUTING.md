@@ -38,6 +38,8 @@ make release
 
 <code>make release</code> writes architecture-specific archives under <code>dist/</code>. It does not publish a release or sign/notarize binaries.
 
+The Homebrew formula is in <code>Formula/antmove.rb</code>. When preparing a release, update its version, pinned source archive URL, and SHA-256 together.
+
 ## Go style
 
 - Run <code>gofmt</code> on every changed Go file.

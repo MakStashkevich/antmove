@@ -3,9 +3,8 @@
 
 [🇺🇸 English](README.md) · [🇯🇵 日本語](README_JA.md) · [🇨🇳 简体中文](README_ZH_CN.md) · [🇰🇷 한국어](README_KO.md) · [🇫🇷 Français](README_FR.md) · [🇺🇦 Українська](README_UK.md) · [🇷🇺 Русский](README_RU.md)
 
-![Stars](https://img.shields.io/github/stars/MakStashkevich/antmove?style=flat) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](#)
+[![Stars](https://img.shields.io/github/stars/MakStashkevich/antmove?style=flat)](https://github.com/MakStashkevich/antmove/stargazers) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](#) [![X](https://img.shields.io/badge/X-follow-000000?logo=x&logoColor=white)](https://x.com/makstashkevich) [![Telegram](https://img.shields.io/badge/Telegram-join-26A5E4?logo=telegram&logoColor=white)](https://t.me/maksidea)
 
-作者：[Maksim Stashkevich](https://stashkevich.com) · [GitHub](https://github.com/MakStashkevich/antmove) · [X](https://x.com/makstashkevich) · [Telegram](https://t.me/maksidea)
 
 
 Mac 的空间总是在最不合适的时候用完：我要装应用、更新 Xcode、下载游戏，或者给 iPhone 留个备份的时候。
@@ -58,23 +57,32 @@ cd ~/Downloads/antmove
 要手动安装或修复命令：
 
 ~~~sh
-./install.sh
+./install-local.sh
 ~~~
 
 ### 用 Bash 脚本安装发行版
 
-项目里有 <code>install-online.sh</code>。它会识别 macOS 和处理器架构，把匹配的最新版本下载到临时目录，再运行压缩包里的安装器。它不会扫描或移动你的文件。
-
-先下载脚本看一下内容，再运行：
+<code>install.sh</code> 会识别 macOS 和处理器架构，下载匹配的最新版本并安装。它不会扫描或移动你的文件。脚本本身就是普通 Bash，想看可以先打开链接。
 
 ~~~sh
-curl -fL -o install-online.sh https://raw.githubusercontent.com/MakStashkevich/antmove/main/install-online.sh
-less install-online.sh
-bash install-online.sh
+curl -fsSL https://raw.githubusercontent.com/MakStashkevich/antmove/main/install.sh | bash
 ~~~
 
 
-我建议先把脚本下载下来看看。没看过就直接 <code>curl | bash</code>，多少有点盲开。
+### 通过 Homebrew 安装
+
+~~~sh
+brew tap MakStashkevich/antmove https://github.com/MakStashkevich/antmove.git
+brew install antmove
+~~~
+
+之后更新：
+
+~~~sh
+brew upgrade antmove
+~~~
+
+Homebrew 会从源码编译 antmove，并安装 <code>antmove</code> 和 <code>am</code>。Go 会作为编译依赖自动安装。
 
 ### 自己编译
 

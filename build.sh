@@ -14,10 +14,10 @@ for ARCH in arm64 amd64; do
   trap 'rm -rf "$TEMP_DIR"' EXIT
   echo "Building macOS $ARCH..."
   (cd "$ROOT" && CGO_ENABLED=0 GOOS=darwin GOARCH="$ARCH" go build -trimpath -ldflags="-s -w -X main.version=$VERSION" -o "$TEMP_DIR/antmove" .)
-  cp "$ROOT/install.sh" "$ROOT/install-online.sh" "$ROOT/LICENSE" "$ROOT/llms.txt" "$TEMP_DIR/"
+  cp "$ROOT/install-local.sh" "$ROOT/LICENSE" "$ROOT/llms.txt" "$TEMP_DIR/"
   cp "$ROOT"/README*.md "$TEMP_DIR/"
-  chmod +x "$TEMP_DIR/install.sh" "$TEMP_DIR/install-online.sh"
-  (cd "$TEMP_DIR" && tar -czf "$ROOT/dist/antmove_${VERSION}_darwin_${ARCH}.tar.gz" antmove install.sh install-online.sh LICENSE llms.txt README*.md)
+  chmod +x "$TEMP_DIR/install-local.sh"
+  (cd "$TEMP_DIR" && tar -czf "$ROOT/dist/antmove_${VERSION}_darwin_${ARCH}.tar.gz" antmove install-local.sh LICENSE llms.txt README*.md)
   rm -rf "$TEMP_DIR"
   trap - EXIT
 done

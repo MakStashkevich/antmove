@@ -2,9 +2,8 @@
 
 [🇺🇸 English](README.md) · [🇯🇵 日本語](README_JA.md) · [🇨🇳 简体中文](README_ZH_CN.md) · [🇰🇷 한국어](README_KO.md) · [🇫🇷 Français](README_FR.md) · [🇺🇦 Українська](README_UK.md) · [🇷🇺 Русский](README_RU.md)
 
-![Stars](https://img.shields.io/github/stars/MakStashkevich/antmove?style=flat) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](#)
+[![Stars](https://img.shields.io/github/stars/MakStashkevich/antmove?style=flat)](https://github.com/MakStashkevich/antmove/stargazers) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](#) [![X](https://img.shields.io/badge/X-follow-000000?logo=x&logoColor=white)](https://x.com/makstashkevich) [![Telegram](https://img.shields.io/badge/Telegram-join-26A5E4?logo=telegram&logoColor=white)](https://t.me/maksidea)
 
-автор: [Maksim Stashkevich](https://stashkevich.com) · [GitHub](https://github.com/MakStashkevich/antmove) · [x](https://x.com/makstashkevich) · [telegram](https://t.me/maksidea)
 
 
 короче, с местом на mac у меня начались проблемы. приложения, их данные, xcode, бэкапы, фото, видео, музыка — всё это постепенно набралось на внутреннем диске. а потом в какой-то момент стало не хватать места уже на обычные вещи: поставить приложение, скачать игру, сделать очередную копию айфона.
@@ -55,23 +54,36 @@ cd ~/Downloads/antmove
 а если надо явно установить или починить команды, выполни:
 
 ~~~sh
-./install.sh
+./install-local.sh
 ~~~
 
 ### установить bash-скриптом
 
-в проекте есть <code>install-online.sh</code>. он проверит macos и тип процессора, скачает последний релиз во временную папку и запустит установщик из архива. пользовательские данные скрипт не сканирует и не переносит.
+в проекте есть <code>install.sh</code>. он проверит macos и тип процессора, скачает последний релиз во временную папку и установит cli. пользовательские данные скрипт не сканирует и не переносит.
 
-скачай скрипт и сначала посмотри, что он делает:
+установить можно одной командой:
 
 ~~~sh
-curl -fL -o install-online.sh https://raw.githubusercontent.com/MakStashkevich/antmove/main/install-online.sh
-less install-online.sh
-bash install-online.sh
+curl -fsSL https://raw.githubusercontent.com/MakStashkevich/antmove/main/install.sh | bash
 ~~~
 
 
-я специально предлагаю сначала скачать скрипт и посмотреть его. запускать вслепую через <code>curl | bash</code> — так себе привычка.
+скрипт написан на обычном bash, его можно открыть по этой же ссылке перед запуском. он только скачивает antmove и устанавливает его; файлы не сканирует и не переносит.
+
+### установить через homebrew
+
+~~~sh
+brew tap MakStashkevich/antmove https://github.com/MakStashkevich/antmove.git
+brew install antmove
+~~~
+
+Чтобы обновить потом:
+
+~~~sh
+brew upgrade antmove
+~~~
+
+Homebrew соберёт antmove из исходников и установит команды <code>antmove</code> и <code>am</code>. Go он сам поставит как зависимость для сборки.
 
 ### собрать самому
 

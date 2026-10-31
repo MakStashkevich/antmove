@@ -3,9 +3,8 @@
 
 [🇺🇸 English](README.md) · [🇯🇵 日本語](README_JA.md) · [🇨🇳 简体中文](README_ZH_CN.md) · [🇰🇷 한국어](README_KO.md) · [🇫🇷 Français](README_FR.md) · [🇺🇦 Українська](README_UK.md) · [🇷🇺 Русский](README_RU.md)
 
-![Stars](https://img.shields.io/github/stars/MakStashkevich/antmove?style=flat) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](#)
+[![Stars](https://img.shields.io/github/stars/MakStashkevich/antmove?style=flat)](https://github.com/MakStashkevich/antmove/stargazers) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](#) [![X](https://img.shields.io/badge/X-follow-000000?logo=x&logoColor=white)](https://x.com/makstashkevich) [![Telegram](https://img.shields.io/badge/Telegram-join-26A5E4?logo=telegram&logoColor=white)](https://t.me/maksidea)
 
-автор: [Maksim Stashkevich](https://stashkevich.com) · [GitHub](https://github.com/MakStashkevich/antmove) · [x](https://x.com/makstashkevich) · [telegram](https://t.me/maksidea)
 
 місце на mac закінчується в найгірший момент: коли треба встановити програму, оновити xcode, завантажити гру чи зберегти чергову резервну копію iphone.
 
@@ -53,23 +52,36 @@ cd ~/Downloads/antmove
 Щоб явно встановити або відновити команди:
 
 ~~~sh
-./install.sh
+./install-local.sh
 ~~~
 
 ### встановлення Bash-скриптом
 
-У проєкті є <code>install-online.sh</code>. Він перевіряє macOS і архітектуру процесора, завантажує останній реліз у тимчасову папку й запускає інсталятор з архіву. Файли він не сканує і не переносить.
+<code>install.sh</code> перевіряє macOS і архітектуру процесора, завантажує останній реліз і встановлює antmove. Файли він не сканує і не переносить.
 
-Спершу завантаж скрипт і прочитай його:
+Встановити можна однією командою:
 
 ~~~sh
-curl -fL -o install-online.sh https://raw.githubusercontent.com/MakStashkevich/antmove/main/install-online.sh
-less install-online.sh
-bash install-online.sh
+curl -fsSL https://raw.githubusercontent.com/MakStashkevich/antmove/main/install.sh | bash
 ~~~
 
 
-Я б не запускав скрипт навмання через <code>curl | bash</code>. Краще спершу завантажити й подивитися, що він робить.
+Скрипт написаний звичайним Bash, його можна прочитати за цим посиланням. Він лише завантажує та встановлює antmove, файли не сканує й не переносить.
+
+### встановити через Homebrew
+
+~~~sh
+brew tap MakStashkevich/antmove https://github.com/MakStashkevich/antmove.git
+brew install antmove
+~~~
+
+Щоб оновити пізніше:
+
+~~~sh
+brew upgrade antmove
+~~~
+
+Homebrew збере antmove з вихідного коду й встановить команди <code>antmove</code> та <code>am</code>. Go встановиться автоматично як залежність для збірки.
 
 ### зібрати самостійно
 

@@ -53,7 +53,7 @@ For interrupted operations, read <code>am status</code> first. <code>am recover<
 
 ## Installation and removal
 
-Installation does not scan or move data. The Bash release installer downloads a published release and installs the CLI for the current user. Explain what it does and verify with <code>am --version</code>.
+Installation does not scan or move data. Offer either Homebrew (<code>brew tap MakStashkevich/antmove https://github.com/MakStashkevich/antmove.git</code>, then <code>brew install antmove</code>) or the one-line Bash release installer in the README. Explain what installation changes and verify with <code>am --version</code>.
 
 <code>am uninstall</code> removes antmove and its local state after two confirmations. It does not restore moved items. Run it only when the user explicitly asks to uninstall, after explaining the effect and checking whether anything still relies on external links.
 

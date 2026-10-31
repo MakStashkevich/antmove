@@ -3,9 +3,8 @@
 
 [🇺🇸 English](README.md) · [🇯🇵 日本語](README_JA.md) · [🇨🇳 简体中文](README_ZH_CN.md) · [🇰🇷 한국어](README_KO.md) · [🇫🇷 Français](README_FR.md) · [🇺🇦 Українська](README_UK.md) · [🇷🇺 Русский](README_RU.md)
 
-![Stars](https://img.shields.io/github/stars/MakStashkevich/antmove?style=flat) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](#)
+[![Stars](https://img.shields.io/github/stars/MakStashkevich/antmove?style=flat)](https://github.com/MakStashkevich/antmove/stargazers) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](#) [![X](https://img.shields.io/badge/X-follow-000000?logo=x&logoColor=white)](https://x.com/makstashkevich) [![Telegram](https://img.shields.io/badge/Telegram-join-26A5E4?logo=telegram&logoColor=white)](https://t.me/maksidea)
 
-作者: [Maksim Stashkevich](https://stashkevich.com) · [GitHub](https://github.com/MakStashkevich/antmove) · [X](https://x.com/makstashkevich) · [Telegram](https://t.me/maksidea)
 
 
 Macの空き容量がなくなる。アプリを入れたいとき、Xcodeを更新したいとき、ゲームを落としたいとき、iPhoneのバックアップを取りたいときに限って。
@@ -58,23 +57,32 @@ cd ~/Downloads/antmove
 手動でインストールまたは修復する場合:
 
 ~~~sh
-./install.sh
+./install-local.sh
 ~~~
 
 ### Bashスクリプトで入れる
 
-<code>install-online.sh</code>はmacOSとCPUアーキテクチャを確認し、合う最新リリースを一時フォルダにダウンロードして、同梱のインストーラーを実行します。ファイルのスキャンや移動はしません。
-
-先にスクリプトをダウンロードして、内容を読んでから実行してください。
+<code>install.sh</code>はmacOSとCPUアーキテクチャを確認し、合う最新リリースをダウンロードしてインストールします。ファイルのスキャンや移動はしません。普通のBashスクリプトなので、実行前にリンク先で内容を確認できます。
 
 ~~~sh
-curl -fL -o install-online.sh https://raw.githubusercontent.com/MakStashkevich/antmove/main/install-online.sh
-less install-online.sh
-bash install-online.sh
+curl -fsSL https://raw.githubusercontent.com/MakStashkevich/antmove/main/install.sh | bash
 ~~~
 
 
-中身を見ていないものをそのまま<code>curl | bash</code>に流すのはおすすめしません。まずダウンロードすれば、何を実行するのか確認できます。
+### Homebrewでインストール
+
+~~~sh
+brew tap MakStashkevich/antmove https://github.com/MakStashkevich/antmove.git
+brew install antmove
+~~~
+
+更新するとき:
+
+~~~sh
+brew upgrade antmove
+~~~
+
+Homebrewはソースからビルドし、<code>antmove</code>と<code>am</code>をインストールします。ビルド用のGoも自動で入ります。
 
 ### 自分でビルドする
 

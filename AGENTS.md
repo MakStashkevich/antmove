@@ -24,6 +24,8 @@ Antmove is a macOS terminal utility for moving supported apps and data to extern
 | transfer.go | Move/restore execution, verification, rollback and process checks |
 | state.go | Operation journal and persistent antmove state |
 | installer.go | First-run and explicit user installation of antmove/am |
+| install.sh, install-local.sh | One-line release installer and installer bundled with local release archives |
+| Formula/antmove.rb | Homebrew formula |
 | uninstall.go | Two-confirmation removal of antmove and its state |
 | extender_compat.go | Import and recovery of legacy Extender transfer records |
 | platform.go, privilege.go | macOS-specific helpers and narrow privilege requests |
@@ -53,6 +55,7 @@ Keep a behavior change in its owning file. Avoid expanding the CLI surface when 
 - Run the focused Go tests for behavior changes and the full <code>make test</code> before a release.
 - Run <code>make check</code> for formatting, vet, and tests.
 - Build both release architectures with <code>make release</code> or <code>./build.sh</code>.
+- Keep the Homebrew formula version, source URL, and SHA-256 aligned with the release source commit.
 - Do not claim a release is published unless a GitHub release exists and its assets are verified.
 - When a command, option, candidate type, or safety rule changes, update all seven README files, <code>llms.txt</code>, and the agent skill where applicable.
 

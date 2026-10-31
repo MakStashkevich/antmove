@@ -3,9 +3,8 @@
 
 [🇺🇸 English](README.md) · [🇯🇵 日本語](README_JA.md) · [🇨🇳 简体中文](README_ZH_CN.md) · [🇰🇷 한국어](README_KO.md) · [🇫🇷 Français](README_FR.md) · [🇺🇦 Українська](README_UK.md) · [🇷🇺 Русский](README_RU.md)
 
-![Stars](https://img.shields.io/github/stars/MakStashkevich/antmove?style=flat) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](#)
+[![Stars](https://img.shields.io/github/stars/MakStashkevich/antmove?style=flat)](https://github.com/MakStashkevich/antmove/stargazers) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](#) [![X](https://img.shields.io/badge/X-follow-000000?logo=x&logoColor=white)](https://x.com/makstashkevich) [![Telegram](https://img.shields.io/badge/Telegram-join-26A5E4?logo=telegram&logoColor=white)](https://t.me/maksidea)
 
-author: [Maksim Stashkevich](https://stashkevich.com) · [GitHub](https://github.com/MakStashkevich/antmove) · [x](https://x.com/makstashkevich) · [telegram](https://t.me/maksidea)
 
 
 so, my mac ran out of space. not someday in theory — right when i needed to install an app, update Xcode, download a game, or keep another iPhone backup.
@@ -58,23 +57,36 @@ you can also skip installation and launch it from the extracted folder:
 to install or repair the commands explicitly:
 
 ~~~sh
-./install.sh
+./install-local.sh
 ~~~
 
 ### use the Bash installer
 
-the project includes <code>install-online.sh</code>. it checks macOS and your processor type, downloads the latest matching release to a temporary folder, and runs the installer from the archive. it doesn't scan or move your files.
+the project includes <code>install.sh</code>. it checks macOS and your processor type, downloads the latest matching release to a temporary folder, and installs the CLI. it doesn't scan or move your files.
 
-download the script and read it before running:
+install with one command:
 
 ~~~sh
-curl -fL -o install-online.sh https://raw.githubusercontent.com/MakStashkevich/antmove/main/install-online.sh
-less install-online.sh
-bash install-online.sh
+curl -fsSL https://raw.githubusercontent.com/MakStashkevich/antmove/main/install.sh | bash
 ~~~
 
 
-i'd rather you read the script first. piping something you haven't seen through <code>curl | bash</code> is a habit i wouldn't recommend.
+the script is plain Bash; you can read it at the same URL before running it. It only downloads antmove and runs its installer. it doesn't scan or move your files.
+
+### install with Homebrew
+
+~~~sh
+brew tap MakStashkevich/antmove https://github.com/MakStashkevich/antmove.git
+brew install antmove
+~~~
+
+To update later:
+
+~~~sh
+brew upgrade antmove
+~~~
+
+Homebrew builds antmove from source and installs both <code>antmove</code> and <code>am</code>. Go is installed automatically as a build dependency.
 
 ### build it yourself
 

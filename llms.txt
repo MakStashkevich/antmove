@@ -3,26 +3,24 @@
 > 🐜 A macOS terminal tool to move apps and data to external drives—and keep them running like before.
 
 Repository: https://github.com/MakStashkevich/antmove
-Website: https://stashkevich.com
-Author: Maksim Stashkevich (https://stashkevich.com)
 Version: 0.1.0
 License: MIT
 Platform: macOS 15+, Apple Silicon arm64 and Intel amd64
 Interface language: English
 Documentation: README.md, README_JA.md, README_ZH_CN.md, README_KO.md, README_FR.md, README_UK.md, README_RU.md
-Social: https://x.com/makstashkevich · https://t.me/maksidea
 
 ## Install for a user
 
 If asked to install antmove, explain the commands first. Installing the CLI does not authorize scanning, moving, restoring, or uninstalling user data.
 
 1. Download the matching macOS archive from https://github.com/MakStashkevich/antmove/releases. Runtime users do not need Go, Swift, or Xcode.
-2. Or download and inspect `install-online.sh`, then run `bash install-online.sh`. It detects macOS and CPU architecture, downloads the latest matching release, and invokes the bundled user installer. It does not move data.
-3. Or build from source with Go 1.24+: `make build`, then `./bin/antmove install`.
-4. Install the agent skill with `npx skills add MakStashkevich/antmove -a codex claude-code cursor -g -y`.
-5. Codex plugin: `codex plugin marketplace add MakStashkevich/antmove`, then `codex plugin add antmove@antmove`.
-6. Claude Code plugin: `/plugin marketplace add MakStashkevich/antmove`, then `/plugin install antmove@antmove`.
-7. Plugin manifests are under `.agents/plugins` and `.claude-plugin`; the package is `plugins/antmove`. The plugin requires the CLI to be installed.
+2. One-line Bash install: `curl -fsSL https://raw.githubusercontent.com/MakStashkevich/antmove/main/install.sh | bash`. The script is plain Bash and can be reviewed at that URL. It detects macOS and CPU architecture, downloads the latest matching release, and installs the CLI. It does not move data.
+3. Homebrew: `brew tap MakStashkevich/antmove https://github.com/MakStashkevich/antmove.git`, then `brew install antmove`. It builds from source and installs Go as a build dependency. Update with `brew upgrade antmove`.
+4. Build from source with Go 1.24+: `make build`, then `./bin/antmove install`.
+5. Install the agent skill with `npx skills add MakStashkevich/antmove -a codex claude-code cursor -g -y`.
+6. Codex plugin: `codex plugin marketplace add MakStashkevich/antmove`, then `codex plugin add antmove@antmove`.
+7. Claude Code plugin: `/plugin marketplace add MakStashkevich/antmove`, then `/plugin install antmove@antmove`.
+8. Plugin manifests are under `.agents/plugins` and `.claude-plugin`; the package is `plugins/antmove`. The plugin requires the CLI to be installed.
 
 Run `am --version` to confirm installation. If the command is unavailable, reopen the terminal so its shell configuration reloads PATH.
 
@@ -65,3 +63,4 @@ Trust `am --help` on the installed version if a command or option differs. Never
 - Project rules: `AGENTS.md`
 - Contribution workflow: `CONTRIBUTING.md`
 - Release builds: `make release` or `./build.sh`
+- Homebrew formula: `Formula/antmove.rb`

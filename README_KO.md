@@ -3,9 +3,8 @@
 
 [🇺🇸 English](README.md) · [🇯🇵 日本語](README_JA.md) · [🇨🇳 简体中文](README_ZH_CN.md) · [🇰🇷 한국어](README_KO.md) · [🇫🇷 Français](README_FR.md) · [🇺🇦 Українська](README_UK.md) · [🇷🇺 Русский](README_RU.md)
 
-![Stars](https://img.shields.io/github/stars/MakStashkevich/antmove?style=flat) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](#)
+[![Stars](https://img.shields.io/github/stars/MakStashkevich/antmove?style=flat)](https://github.com/MakStashkevich/antmove/stargazers) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](#) [![X](https://img.shields.io/badge/X-follow-000000?logo=x&logoColor=white)](https://x.com/makstashkevich) [![Telegram](https://img.shields.io/badge/Telegram-join-26A5E4?logo=telegram&logoColor=white)](https://t.me/maksidea)
 
-만든 사람: [Maksim Stashkevich](https://stashkevich.com) · [GitHub](https://github.com/MakStashkevich/antmove) · [X](https://x.com/makstashkevich) · [Telegram](https://t.me/maksidea)
 
 Mac 저장 공간은 꼭 앱을 설치하거나 Xcode를 업데이트하고, 게임을 받거나 iPhone을 백업하려는 순간에 모자랍니다.
 
@@ -57,23 +56,32 @@ cd ~/Downloads/antmove
 명령을 직접 설치하거나 복구하려면:
 
 ~~~sh
-./install.sh
+./install-local.sh
 ~~~
 
 ### Bash 스크립트로 설치
 
-프로젝트에 <code>install-online.sh</code>가 있습니다. macOS와 CPU 종류를 확인하고 맞는 최신 릴리스를 임시 폴더에 받은 다음, 압축 파일 안의 설치 프로그램을 실행합니다.  파일을 스캔하거나 옮기지는 않습니다.
-
-스크립트를 먼저 내려받아 내용을 읽고 실행하세요.
+<code>install.sh</code>는 macOS와 CPU 종류를 확인하고 맞는 최신 릴리스를 받아 설치합니다. 파일을 스캔하거나 옮기지는 않습니다. 평범한 Bash 스크립트라 실행 전에 링크에서 내용을 볼 수 있어요.
 
 ~~~sh
-curl -fL -o install-online.sh https://raw.githubusercontent.com/MakStashkevich/antmove/main/install-online.sh
-less install-online.sh
-bash install-online.sh
+curl -fsSL https://raw.githubusercontent.com/MakStashkevich/antmove/main/install.sh | bash
 ~~~
 
 
-안 읽은 스크립트를 바로 <code>curl | bash</code>로 실행하는 건 별로 권하지 않습니다. 먼저 내려받아 보면 뭘 실행하는지 알 수 있어요.
+### Homebrew로 설치하기
+
+~~~sh
+brew tap MakStashkevich/antmove https://github.com/MakStashkevich/antmove.git
+brew install antmove
+~~~
+
+나중에 업데이트하려면:
+
+~~~sh
+brew upgrade antmove
+~~~
+
+Homebrew가 소스에서 antmove를 빌드하고 <code>antmove</code>와 <code>am</code>을 설치합니다. 빌드에 필요한 Go도 자동으로 설치됩니다.
 
 ### 직접 빌드하기
 
