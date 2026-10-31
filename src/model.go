@@ -2,7 +2,7 @@ package main
 
 import "time"
 
-var version = "0.1.1"
+var version = "0.1.2"
 
 type Category string
 

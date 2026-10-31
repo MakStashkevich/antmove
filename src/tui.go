@@ -730,7 +730,9 @@ func (m tuiModel) View() string {
 			b.WriteString(fmt.Sprintf("%s%d  %-34s %s\n", marker, i+1, option, shortcuts[i]))
 		}
 		if m.loaded {
-			b.WriteString(fmt.Sprintf("\n  %d candidates · %d moved items · %d eligible disks\n", len(m.items), len(m.operations), eligibleVolumeCount(m.volumes)))
+			movedItems, movedBytes := completedTransferStats(m.operations)
+			b.WriteString(fmt.Sprintf("\n  %d candidates · %d moved items · %d eligible disks\n", len(m.items), movedItems, eligibleVolumeCount(m.volumes)))
+			b.WriteString(fmt.Sprintf("\n  Storage freedom · %s freed on this Mac and moved to external disks\n", formatBytes(movedBytes)))
 		} else {
 			b.WriteString(fmt.Sprintf("\n  %s Scanning candidates and disks…\n", spinnerFrame(m.spinner)))
 		}
@@ -894,10 +896,10 @@ func (m tuiModel) View() string {
 	}
 	b.WriteString("\n" + strings.Repeat("─", width) + "\n")
 	b.WriteString("  " + m.controlsLine() + "\n")
-	return styleTerminalView(wrapTerminalView(b.String(), width), logo, antOffset, textStart)
+	return styleTerminalView(wrapTerminalView(b.String(), width), m.page, logo, antOffset, textStart)
 }
 
-func styleTerminalView(view string, logo []string, antOffset, textStart int) string {
+func styleTerminalView(view, page string, logo []string, antOffset, textStart int) string {
 	lines := strings.Split(view, "\n")
 	footerStart := -1
 	for i, line := range lines {
@@ -913,12 +915,18 @@ func styleTerminalView(view string, logo []string, antOffset, textStart int) str
 			if i == len(logo)-1 {
 				headingPending = true
 			}
+		case page == "home" && strings.Contains(line, "Restore moved data"):
+			if strings.HasPrefix(line, "› ") {
+				lines[i] = tuiSelectedStyle.Render(line)
+			}
+		case strings.Contains(line, " · disk connected") || strings.Contains(line, " · disk offline"):
+			lines[i] = styleRestoreDiskStatusLine(line)
 		case headingPending && strings.TrimSpace(line) != "" && strings.Trim(line, "─") != "":
 			lines[i] = tuiHeadingStyle.Render(line)
 			headingPending = false
 		case strings.Contains(line, "WARNING:") || strings.Contains(line, "Warning:") || strings.Contains(line, "FAILED") || strings.Contains(line, "unavailable") || strings.Contains(line, "disk offline") || strings.Contains(line, "not recommended"):
 			lines[i] = tuiWarningStyle.Render(line)
-		case strings.Contains(line, "MOVED ") || strings.Contains(line, "RESTORED ") || strings.Contains(line, "complete") || strings.Contains(line, " moved ") || strings.Contains(line, "Excellent"):
+		case strings.Contains(line, "MOVED ") || strings.Contains(line, "RESTORED ") || strings.Contains(line, "complete") || strings.Contains(line, "Storage freedom") || strings.Contains(line, "Excellent"):
 			lines[i] = tuiSuccessStyle.Render(line)
 		case strings.Contains(line, "Scanning") || strings.Contains(line, "Loading") || strings.Contains(line, "Recovering") || strings.Contains(line, "Measuring"):
 			lines[i] = tuiActiveStyle.Render(line)
@@ -931,6 +939,22 @@ func styleTerminalView(view string, logo []string, antOffset, textStart int) str
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+func styleRestoreDiskStatusLine(line string) string {
+	separator := strings.LastIndex(line, " · ")
+	if separator < 0 {
+		return line
+	}
+	prefix, status := line[:separator], line[separator+len(" · "):]
+	statusStyle := tuiWarningStyle
+	if status == "disk connected" {
+		statusStyle = tuiSuccessStyle
+	}
+	if strings.HasPrefix(prefix, "› ") || strings.HasPrefix(prefix, " ● ") {
+		prefix = tuiSelectedStyle.Render(prefix)
+	}
+	return prefix + " · " + statusStyle.Render(status)
 }
 
 func (m tuiModel) controlsLine() string {
@@ -1115,6 +1139,19 @@ func (m tuiModel) restorableOperations() []Operation {
 		}
 	}
 	return result
+}
+
+func completedTransferStats(operations []Operation) (int, int64) {
+	count := 0
+	var bytes int64
+	for _, op := range operations {
+		if op.Phase != "completed" {
+			continue
+		}
+		count++
+		bytes += op.SizeBytes
+	}
+	return count, bytes
 }
 
 func (m tuiModel) selectedOperationList() []Operation {
