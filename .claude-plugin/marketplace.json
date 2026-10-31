@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "antmove",
+  "description": "Agent skill for safely using the antmove macOS storage CLI.",
+  "owner": {
+    "name": "Maksim Stashkevich"
+  },
+  "plugins": [
+    {
+      "name": "antmove",
+      "description": "Inspect disks and safely move or restore supported Mac apps and data.",
+      "category": "productivity",
+      "source": "./plugins/antmove",
+      "homepage": "https://stashkevich.com"
+    }
+  ]
+}
+

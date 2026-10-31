@@ -1,0 +1,12 @@
+{
+  "name": "antmove",
+  "description": "Safely inspect external disks and move or restore supported macOS apps and data with antmove.",
+  "author": {
+    "name": "Maksim Stashkevich",
+    "url": "https://stashkevich.com"
+  },
+  "homepage": "https://stashkevich.com",
+  "license": "MIT",
+  "keywords": ["macos", "external-storage", "disk-space", "backup", "cli"]
+}
+

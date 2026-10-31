@@ -1,0 +1,62 @@
+# Antmove Agent Guide
+
+This file is the repository contract for AI agents and contributors. Read it before changing code, documentation, release files, or transfer behavior.
+
+## Product
+
+Antmove is a macOS terminal utility for moving supported apps and data to external storage while leaving a symbolic link at the original path. Its purpose is storage relocation, not cleanup or deletion.
+
+- Supported OS: macOS 15 or later.
+- Implementation: Go; Bubble Tea is used for the terminal UI.
+- Release architectures: Apple Silicon arm64 and Intel amd64.
+- Runtime users do not need Go, Swift, or Xcode.
+- The interactive interface is English. README documentation is maintained in English, Japanese, Simplified Chinese, Korean, French, Ukrainian, and Russian.
+- Canonical repository: https://github.com/MakStashkevich/antmove. The Telegram community URL is still pending; do not invent it.
+
+## Source map
+
+| File | Responsibility |
+| --- | --- |
+| main.go | CLI routing, flags, help, command output |
+| tui.go | Bubble Tea menu, navigation, confirmation and rendering |
+| scanner.go | Candidate discovery, app association, sizing, status |
+| volumes.go | External disk detection, suitability and speed measurement |
+| transfer.go | Move/restore execution, verification, rollback and process checks |
+| state.go | Operation journal and persistent antmove state |
+| installer.go | First-run and explicit user installation of antmove/am |
+| uninstall.go | Two-confirmation removal of antmove and its state |
+| extender_compat.go | Import and recovery of legacy Extender transfer records |
+| platform.go, privilege.go | macOS-specific helpers and narrow privilege requests |
+| core_test.go | Tests for core transfer and safety behavior |
+| build.sh, Makefile | Cross-architecture release archives and local developer targets |
+| skills/antmove/SKILL.md | Canonical agent skill |
+| plugins/antmove | Plugin packaging copy of the skill |
+
+Keep a behavior change in its owning file. Avoid expanding the CLI surface when an existing menu or command can present the choice clearly.
+
+## Safety contract
+
+1. Scanning, status, disk listing, and dry-run are read-only. Prefer them before any operation that changes files.
+2. A real move or restore requires the user's explicit request. Show or run a dry-run first, explain the paths, disk, size, and material warning, then wait for approval.
+3. A caution-rated disk requires two separate confirmations. Never suggest that double confirmation makes an unsuitable disk recommended.
+4. Never automatically close an app, Docker/container engine, backup, or sync process. Detect related activity and stop the operation with a clear instruction.
+5. Copy with macOS ditto to a staging path, verify content, then create the original-path symlink. Keep journal phases and recovery behavior consistent with the transfer state machine.
+6. Do not remove the original data before verification. On failure, restore the source path or leave a clear recovery-required journal entry.
+7. Preserve spaces, Unicode, and symlink semantics in paths. Quote every path passed to an external command.
+8. Do not treat Docker Desktop, OrbStack, Colima, or Rancher Desktop engine stores as ordinary folders. Show supported vendor guidance instead.
+9. Apple TV downloads may be DRM protected; Photos, Music, TV and device backups need app-specific warnings. Do not alter app preferences unless the feature explicitly supports that workflow.
+10. Do not add background services, telemetry, remote Docker scanning, or undocumented private-storage discovery without an explicit product decision.
+
+## Development workflow
+
+- Format Go changes with gofmt.
+- Run the focused Go tests for behavior changes and the full <code>make test</code> before a release.
+- Run <code>make check</code> for formatting, vet, and tests.
+- Build both release architectures with <code>make release</code> or <code>./build.sh</code>.
+- Do not claim a release is published unless a GitHub release exists and its assets are verified.
+- When a command, option, candidate type, or safety rule changes, update all seven README files, <code>llms.txt</code>, and the agent skill where applicable.
+
+## CLI reference
+
+Use <code>am --help</code> as the current source of truth. The supported commands are <code>am</code>, <code>am install</code>, <code>am uninstall</code>, <code>am scan</code>, <code>am disks</code>, <code>am move</code>, <code>am restore</code>, <code>am status</code>, <code>am recover</code>, and <code>am migrate</code>. Do not invent flags or claim that container engine stores are directly movable.
+

@@ -1,0 +1,67 @@
+# antmove
+
+> 🐜 A macOS terminal tool to move apps and data to external drives—and keep them running like before.
+
+Repository: https://github.com/MakStashkevich/antmove
+Website: https://stashkevich.com
+Author: Maksim Stashkevich (https://stashkevich.com)
+Version: 0.1.0
+License: MIT
+Platform: macOS 15+, Apple Silicon arm64 and Intel amd64
+Interface language: English
+Documentation: README.md, README_JA.md, README_ZH_CN.md, README_KO.md, README_FR.md, README_UK.md, README_RU.md
+Social: https://x.com/makstashkevich · https://t.me/maksidea
+
+## Install for a user
+
+If asked to install antmove, explain the commands first. Installing the CLI does not authorize scanning, moving, restoring, or uninstalling user data.
+
+1. Download the matching macOS archive from https://github.com/MakStashkevich/antmove/releases. Runtime users do not need Go, Swift, or Xcode.
+2. Or download and inspect `install-online.sh`, then run `bash install-online.sh`. It detects macOS and CPU architecture, downloads the latest matching release, and invokes the bundled user installer. It does not move data.
+3. Or build from source with Go 1.24+: `make build`, then `./bin/antmove install`.
+4. Install the agent skill with `npx skills add MakStashkevich/antmove -a codex claude-code cursor -g -y`.
+5. Codex plugin: `codex plugin marketplace add MakStashkevich/antmove`, then `codex plugin add antmove@antmove`.
+6. Claude Code plugin: `/plugin marketplace add MakStashkevich/antmove`, then `/plugin install antmove@antmove`.
+7. Plugin manifests are under `.agents/plugins` and `.claude-plugin`; the package is `plugins/antmove`. The plugin requires the CLI to be installed.
+
+Run `am --version` to confirm installation. If the command is unavailable, reopen the terminal so its shell configuration reloads PATH.
+
+## Safe use
+
+- Start with `am scan`, `am disks`, and `am status`. These are read-only.
+- Before every real move or restore, use `--dry-run`, review exact paths, sizes, destination format, free space, suitability, and warnings, then get the user's explicit approval.
+- Do not treat questions, installation consent, or prior operations as permission to move new items.
+- Never terminate an app, backup, sync process, or container engine automatically. Ask the user to close it and rescan.
+- Caution-rated disks require two separate confirmations in the CLI. Read-only, network, system, and unavailable disks are not valid destinations.
+- Keep all destination disks connected while their moved data is in use.
+- Apple Photos/Music/TV and iPhone/iPad backups have app-specific requirements. macOS may require Full Disk Access for the terminal. Apple TV downloads may use DRM.
+- Antmove provides vendor guidance for Docker Desktop, OrbStack, Colima, and Rancher Desktop. It does not directly move their VM/database stores.
+- Recovery and uninstall change files/state. Run them only when requested and after explaining the effects.
+
+## Commands
+
+- `am`: interactive menu
+- `am install`: install or repair antmove and am
+- `am uninstall`: remove antmove and local state after two confirmations
+- `am scan`: list transfer candidates and statuses
+- `am disks`: inspect eligible external disks; `am disks --test PATH` measures speed
+- `am move --disk PATH --dry-run ID`: preview a transfer
+- `am move --disk PATH --yes ID`: perform a reviewed transfer to a recommended disk
+- `am move --disk PATH --confirm-caution --confirm-caution ID`: acknowledge a caution-rated disk twice
+- `am restore --dry-run ID`: preview restore
+- `am restore --yes ID`: restore a selected item
+- `am status`: show the journal and destination availability
+- `am recover`: continue an interrupted operation
+- `am migrate --dry-run`: preview legacy Extender record migration
+- `am migrate`: import eligible legacy Extender records
+- `am --help` and `am --version`: help and system/version information
+
+Trust `am --help` on the installed version if a command or option differs. Never invent flags or claim that an unrecognized directory is safe to move.
+
+## References
+
+- Full instructions, examples, disk suitability, Apple media guidance, and troubleshooting: README.md and the localized README files listed above.
+- Agent operating rules: `skills/antmove/SKILL.md`
+- Project rules: `AGENTS.md`
+- Contribution workflow: `CONTRIBUTING.md`
+- Release builds: `make release` or `./build.sh`

@@ -1,0 +1,21 @@
+{
+  "name": "antmove",
+  "interface": {
+    "displayName": "antmove"
+  },
+  "plugins": [
+    {
+      "name": "antmove",
+      "source": {
+        "source": "local",
+        "path": "./plugins/antmove"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
+
