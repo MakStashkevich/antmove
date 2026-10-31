@@ -38,7 +38,20 @@ make release
 
 <code>make release</code> writes architecture-specific archives under <code>dist/</code>. It does not publish a release or sign/notarize binaries.
 
-The Homebrew formula is in <code>Formula/antmove.rb</code>. When preparing a release, update its version, pinned source archive URL, and SHA-256 together.
+## Publishing a release
+
+GitHub Actions publishes a release when a version tag is pushed. Before tagging:
+
+1. Update <code>version</code> in <code>model.go</code> and update the version, source URL, and SHA-256 in <code>Formula/antmove.rb</code>.
+2. Run <code>make check</code> and <code>make release</code> locally.
+3. Commit the release changes, then create and push a tag that matches the version in <code>model.go</code>. For version <code>0.1.1</code>, use:
+
+~~~sh
+git tag -a v0.1.1 -m "antmove v0.1.1"
+git push origin v0.1.1
+~~~
+
+The workflow verifies the tag, runs Go tests, builds Apple Silicon and Intel archives, generates SHA-256 checksums, and publishes them as assets with generated release notes. Tags must use the <code>vMAJOR.MINOR.PATCH</code> format and match the application version. The workflow does not sign or notarize the binaries.
 
 ## Go style
 
@@ -65,7 +78,7 @@ The Homebrew formula is in <code>Formula/antmove.rb</code>. When preparing a rel
 2. Describe the user problem and the behavior change.
 3. Include the commands used to build and verify the change.
 4. Mention platform or permission limitations.
-5. Do not claim a release; maintainers handle versioning and publication.
+5. Do not create release tags; maintainers handle versioning and publication.
 
 ## License
 
