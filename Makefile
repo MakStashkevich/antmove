@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 GO ?= go
 BIN_DIR ?= bin
-VERSION := $(shell sed -n 's/^var version = "\([^"]*\)"/\1/p' model.go)
+VERSION := $(shell sed -n 's/^var version = "\([^"]*\)"/\1/p' src/model.go)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
 .PHONY: all help build build-arm64 build-amd64 release test vet fmt fmt-check check install clean
@@ -21,13 +21,13 @@ $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
 build: $(BIN_DIR)
-	$(GO) build -trimpath -ldflags="$(LDFLAGS)" -o $(BIN_DIR)/antmove .
+	$(GO) build -trimpath -ldflags="$(LDFLAGS)" -o $(BIN_DIR)/antmove ./src
 
 build-arm64: $(BIN_DIR)
-	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GO) build -trimpath -ldflags="$(LDFLAGS)" -o $(BIN_DIR)/antmove-darwin-arm64 .
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GO) build -trimpath -ldflags="$(LDFLAGS)" -o $(BIN_DIR)/antmove-darwin-arm64 ./src
 
 build-amd64: $(BIN_DIR)
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GO) build -trimpath -ldflags="$(LDFLAGS)" -o $(BIN_DIR)/antmove-darwin-amd64 .
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GO) build -trimpath -ldflags="$(LDFLAGS)" -o $(BIN_DIR)/antmove-darwin-amd64 ./src
 
 release:
 	./build.sh
@@ -39,10 +39,10 @@ vet:
 	$(GO) vet ./...
 
 fmt:
-	gofmt -w *.go
+	gofmt -w src/*.go
 
 fmt-check:
-	@files="$$(gofmt -l *.go)"; if [[ -n "$$files" ]]; then printf 'Go files need formatting:\n%s\n' "$$files"; echo 'Run make fmt'; exit 1; fi
+	@files="$$(gofmt -l src/*.go)"; if [[ -n "$$files" ]]; then printf 'Go files need formatting:\n%s\n' "$$files"; echo 'Run make fmt'; exit 1; fi
 
 check: fmt-check vet test
 

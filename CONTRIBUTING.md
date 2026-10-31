@@ -42,16 +42,16 @@ make release
 
 GitHub Actions publishes a release when a version tag is pushed. Before tagging:
 
-1. Update <code>version</code> in <code>model.go</code> and update the version, source URL, and SHA-256 in <code>Formula/antmove.rb</code>.
+1. Update <code>version</code> in <code>src/model.go</code>.
 2. Run <code>make check</code> and <code>make release</code> locally.
-3. Commit the release changes, then create and push a tag that matches the version in <code>model.go</code>. For version <code>0.1.1</code>, use:
+3. Commit the release changes, then create and push a tag that matches the version in <code>src/model.go</code>. For version <code>0.1.1</code>, use:
 
 ~~~sh
 git tag -a v0.1.1 -m "antmove v0.1.1"
 git push origin v0.1.1
 ~~~
 
-The workflow verifies the tag, runs Go tests, builds Apple Silicon and Intel archives (named <code>apple-silicon</code> and <code>intel</code>), generates SHA-256 checksums, and publishes them as assets with generated release notes. Tags must use the <code>vMAJOR.MINOR.PATCH</code> format and match the application version. The workflow does not sign or notarize the binaries.
+The workflow verifies the tag, runs Go tests, builds Apple Silicon and Intel archives (named <code>apple-silicon</code> and <code>intel</code>), generates SHA-256 checksums, and publishes them as assets with generated release notes. Tags must use the <code>vMAJOR.MINOR.PATCH</code> format and match the application version. After the tag exists, update <code>Formula/antmove.rb</code> to the tagged source archive and its SHA-256, and build the executable from <code>./src</code>. The workflow does not sign or notarize the binaries.
 
 ## Go style
 

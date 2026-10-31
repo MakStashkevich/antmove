@@ -17,19 +17,21 @@ Antmove is a macOS terminal utility for moving supported apps and data to extern
 
 | File | Responsibility |
 | --- | --- |
-| main.go | CLI routing, flags, help, command output |
-| tui.go | Bubble Tea menu, navigation, confirmation and rendering |
-| scanner.go | Candidate discovery, app association, sizing, status |
-| volumes.go | External disk detection, suitability and speed measurement |
-| transfer.go | Move/restore execution, verification, rollback and process checks |
-| state.go | Operation journal and persistent antmove state |
-| installer.go | First-run and explicit user installation of antmove/am |
+| src/main.go | CLI routing, flags, help, command output |
+| src/model.go, src/display.go | Core types, version metadata, and terminal output formatting |
+| src/tui.go | Bubble Tea menu, navigation, confirmation and rendering |
+| src/scanner.go | Candidate discovery, app association, sizing, status |
+| src/volumes.go | External disk detection, suitability and speed measurement |
+| src/transfer.go | Move/restore execution, verification, rollback and process checks |
+| src/state.go | Operation journal and persistent antmove state |
+| src/installer.go | First-run and explicit user installation of antmove/am |
 | install.sh, install-local.sh | One-line release installer and installer bundled with local release archives |
 | Formula/antmove.rb | Homebrew formula |
-| uninstall.go | Two-confirmation removal of antmove and its state |
-| extender_compat.go | Import and recovery of legacy Extender transfer records |
-| platform.go, privilege.go | macOS-specific helpers and narrow privilege requests |
-| core_test.go | Tests for core transfer and safety behavior |
+| src/uninstall.go | Two-confirmation removal of antmove and its state |
+| src/extender_compat.go | Import and recovery of legacy Extender transfer records |
+| src/platform.go, src/privilege.go | macOS-specific helpers and narrow privilege requests |
+| src/core_test.go | Tests for core transfer and safety behavior |
+| src/*.go | Go implementation and tests |
 | build.sh, Makefile | Cross-architecture release archives and local developer targets |
 | skills/antmove/SKILL.md | Canonical agent skill |
 | plugins/antmove | Plugin packaging copy of the skill |

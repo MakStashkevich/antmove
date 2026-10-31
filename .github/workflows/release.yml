@@ -26,9 +26,9 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          VERSION="$(sed -n 's/^var version = "\([^"]*\)"/\1/p' model.go)"
+          VERSION="$(sed -n 's/^var version = "\([^"]*\)"/\1/p' src/model.go)"
           if [[ "$RELEASE_TAG" != "v$VERSION" ]]; then
-            echo "Tag $RELEASE_TAG does not match model.go version v$VERSION" >&2
+            echo "Tag $RELEASE_TAG does not match src/model.go version v$VERSION" >&2
             exit 1
           fi
 
