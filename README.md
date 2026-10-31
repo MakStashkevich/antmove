@@ -37,7 +37,7 @@ If antmove can't confidently tell which app owns a large folder, it leaves it un
 
 ## how to install
 
-Apple Silicon needs the <code>arm64</code> archive; Intel needs <code>amd64</code>. download the archive for your Mac from [GitHub Releases](https://github.com/MakStashkevich/antmove/releases).
+the archive name says which Mac it fits: <code>apple-silicon</code> is for M-series Macs, and <code>intel</code> is for Intel Macs. download the matching archive from [GitHub Releases](https://github.com/MakStashkevich/antmove/releases).
 
 unpack the archive and launch it once:
 

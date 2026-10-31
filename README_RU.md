@@ -35,7 +35,7 @@ docker desktop, orbstack, colima и rancher desktop тоже могут появ
 
 ## как установить
 
-для apple silicon нужен архив <code>arm64</code>, для intel — <code>amd64</code>. архив для своего mac скачай в [релизах antmove](https://github.com/MakStashkevich/antmove/releases).
+в названии архива указано, для какого mac он подходит: <code>apple-silicon</code> — для Mac на чипах M-серии, <code>intel</code> — для Mac с процессором Intel. скачай подходящий архив в [релизах antmove](https://github.com/MakStashkevich/antmove/releases).
 
 распакуй архив и один раз запусти бинарник:
 

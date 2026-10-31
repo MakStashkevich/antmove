@@ -37,7 +37,7 @@ Docker Desktop、OrbStack、Colima 和 Rancher Desktop 的数据也可能出现�
 
 ## 怎么安装
 
-Apple Silicon 下载 <code>arm64</code>，Intel Mac 下载 <code>amd64</code>。根据 Mac 芯片架构，从 [GitHub Releases](https://github.com/MakStashkevich/antmove/releases) 下载对应压缩包。
+压缩包名称会标明适用的 Mac：<code>apple-silicon</code> 适用于 M 系列芯片，<code>intel</code> 适用于 Intel 处理器。从 [GitHub Releases](https://github.com/MakStashkevich/antmove/releases) 下载对应的压缩包。
 
 解压后启动一次：
 

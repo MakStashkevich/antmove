@@ -37,7 +37,7 @@ macos і програма продовжують використовувати 
 
 ## встановлення
 
-Для Apple Silicon потрібен архів <code>arm64</code>, для Intel Mac — <code>amd64</code>. Архів для свого Mac завантажуй у [GitHub Releases](https://github.com/MakStashkevich/antmove/releases).
+У назві архіву вказано сумісний Mac: <code>apple-silicon</code> — для моделей із чипами серії M, <code>intel</code> — для Mac із процесором Intel. Завантаж відповідний архів у [GitHub Releases](https://github.com/MakStashkevich/antmove/releases).
 
 Розпакуй архів і запусти:
 

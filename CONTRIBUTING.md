@@ -51,7 +51,7 @@ git tag -a v0.1.1 -m "antmove v0.1.1"
 git push origin v0.1.1
 ~~~
 
-The workflow verifies the tag, runs Go tests, builds Apple Silicon and Intel archives, generates SHA-256 checksums, and publishes them as assets with generated release notes. Tags must use the <code>vMAJOR.MINOR.PATCH</code> format and match the application version. The workflow does not sign or notarize the binaries.
+The workflow verifies the tag, runs Go tests, builds Apple Silicon and Intel archives (named <code>apple-silicon</code> and <code>intel</code>), generates SHA-256 checksums, and publishes them as assets with generated release notes. Tags must use the <code>vMAJOR.MINOR.PATCH</code> format and match the application version. The workflow does not sign or notarize the binaries.
 
 ## Go style
 

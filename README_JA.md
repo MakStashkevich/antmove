@@ -37,7 +37,7 @@ Docker Desktop、OrbStack、Colima、Rancher Desktopのストレージも、メ�
 
 ## インストール
 
-Apple Siliconは<code>arm64</code>、Intel Macは<code>amd64</code>のアーカイブです。使っているMacに合うアーカイブを[GitHub Releases](https://github.com/MakStashkevich/antmove/releases)からダウンロードしてください。
+アーカイブ名で対応するMacがわかります。<code>apple-silicon</code>はMシリーズ搭載Mac、<code>intel</code>はIntel搭載Mac向けです。[GitHub Releases](https://github.com/MakStashkevich/antmove/releases)から合うものをダウンロードしてください。
 
 解凍して一度起動してください。
 

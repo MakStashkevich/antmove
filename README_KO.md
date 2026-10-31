@@ -37,7 +37,7 @@ Docker Desktop, OrbStack, Colima, Rancher Desktop 저장 공간도 제조사 안
 
 ## 설치하기
 
-Apple Silicon은 <code>arm64</code>, Intel Mac은 <code>amd64</code> 압축 파일을 받으면 됩니다. Mac 아키텍처에 맞는 파일을 [GitHub Releases](https://github.com/MakStashkevich/antmove/releases)에서 받으세요.
+압축 파일 이름에 지원하는 Mac이 표시됩니다. <code>apple-silicon</code>은 M 시리즈 칩, <code>intel</code>은 Intel 프로세서가 탑재된 Mac용입니다. [GitHub Releases](https://github.com/MakStashkevich/antmove/releases)에서 맞는 파일을 다운로드하세요.
 
 압축을 풀고 한 번 실행하세요.
 

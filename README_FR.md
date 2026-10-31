@@ -37,7 +37,7 @@ si l’app propriétaire d’un grand dossier n’est pas claire, antmove ne fai
 
 ## installation
 
-pour Apple Silicon, prends <code>arm64</code> ; pour un Mac Intel, <code>amd64</code>. télécharge l’archive adaptée à ton Mac dans [GitHub Releases](https://github.com/MakStashkevich/antmove/releases).
+le nom de l’archive indique le Mac compatible : <code>apple-silicon</code> pour les Mac avec puce M, <code>intel</code> pour les Mac Intel. télécharge l’archive adaptée dans [GitHub Releases](https://github.com/MakStashkevich/antmove/releases).
 
 décompresse l’archive et lance-la une première fois :
 
