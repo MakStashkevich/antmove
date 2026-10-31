@@ -1,7 +1,7 @@
 <div align="center">
   <h1>antmove</h1>
-  <p><strong>Mac 저장 공간 걱정은 줄이고, 하던 일은 계속하세요.</strong></p>
-  <p>용량 큰 앱과 데이터를 외장 디스크로 옮기세요. antmove는 원래 경로를 유지하고 이동 전에 복사본을 확인합니다.</p>
+  <p><strong>용량 큰 앱과 데이터를 외장 디스크로 옮기고, 앱은 평소처럼 사용하세요.</strong></p>
+  <p>Mac 내장 저장 공간의 한계에서 더 자유롭게.</p>
   <p>macOS 전용 · 터미널 CLI · 디스크 적합성 확인 · 이동 미리보기 · 복원 지원</p>
   <p><a href="README.md">🇺🇸 English</a> · <a href="README_JA.md">🇯🇵 日本語</a> · <a href="README_ZH_CN.md">🇨🇳 简体中文</a> · <a href="README_KO.md">🇰🇷 한국어</a> · <a href="README_FR.md">🇫🇷 Français</a> · <a href="README_UK.md">🇺🇦 Українська</a> · <a href="README_RU.md">🇷🇺 Русский</a></p>
   <p><a href="https://github.com/MakStashkevich/antmove/stargazers"><img src="https://img.shields.io/github/stars/MakStashkevich/antmove?style=flat" alt="Stars"></a> <a href="https://github.com/MakStashkevich/antmove/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a> <a href="https://github.com/MakStashkevich/antmove"><img src="https://img.shields.io/badge/version-0.1.0-green.svg" alt="Version 0.1.0"></a> <a href="https://x.com/makstashkevich"><img src="https://img.shields.io/badge/X-follow-000000?logo=x&logoColor=white" alt="Follow on X"></a> <a href="https://t.me/maksidea"><img src="https://img.shields.io/badge/Telegram-join-26A5E4?logo=telegram&logoColor=white" alt="Telegram"></a></p>

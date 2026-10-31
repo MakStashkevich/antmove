@@ -1,7 +1,7 @@
 <div align="center">
   <h1>antmove</h1>
-  <p><strong>Macの空き容量を気にせず、使い続けよう。</strong></p>
-  <p>重いアプリやデータを外付けディスクへ。antmoveは元のパスを保ち、移動前にコピーを検証します。</p>
+  <p><strong>重いアプリやデータを外付けディスクへ。アプリはこれまで通り使えます。</strong></p>
+  <p>Mac本体のストレージ容量に縛られず、もっと自由に。</p>
   <p>macOS専用 · ターミナルCLI · ディスク適性チェック · 移動前プレビュー · 復元に対応</p>
   <p><a href="README.md">🇺🇸 English</a> · <a href="README_JA.md">🇯🇵 日本語</a> · <a href="README_ZH_CN.md">🇨🇳 简体中文</a> · <a href="README_KO.md">🇰🇷 한국어</a> · <a href="README_FR.md">🇫🇷 Français</a> · <a href="README_UK.md">🇺🇦 Українська</a> · <a href="README_RU.md">🇷🇺 Русский</a></p>
   <p><a href="https://github.com/MakStashkevich/antmove/stargazers"><img src="https://img.shields.io/github/stars/MakStashkevich/antmove?style=flat" alt="Stars"></a> <a href="https://github.com/MakStashkevich/antmove/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a> <a href="https://github.com/MakStashkevich/antmove"><img src="https://img.shields.io/badge/version-0.1.0-green.svg" alt="Version 0.1.0"></a> <a href="https://x.com/makstashkevich"><img src="https://img.shields.io/badge/X-follow-000000?logo=x&logoColor=white" alt="Follow on X"></a> <a href="https://t.me/maksidea"><img src="https://img.shields.io/badge/Telegram-join-26A5E4?logo=telegram&logoColor=white" alt="Telegram"></a></p>
