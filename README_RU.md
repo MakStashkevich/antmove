@@ -1,5 +1,5 @@
 <div align="center">
-  <h1><img src="src/assets/ant.png" width="48" alt="🐜"> antmove</h1>
+  <h1><img src="src/assets/ant.png" width="48" alt="🐜" align="middle"> antmove</h1>
   <p><strong>переноси тяжёлые приложения и данные на внешний диск — и пользуйся приложениями как раньше.</strong></p>
   <p>больше свободы от ограничений встроенного хранилища mac.</p>
   <p>только macOS · работа в терминале · проверка дисков · предпросмотр переноса · восстановление данных</p>
