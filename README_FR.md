@@ -1,5 +1,5 @@
 <div align="center">
-  <h1 align="center"><img src="src/assets/ant.png" width="48" alt="🐜" align="absmiddle"> antmove</h1>
+  <h1 align="center"><img src="src/assets/ant.png" width="40" alt="🐜" align="absmiddle"> antmove</h1>
   <p><strong>déplace les apps et les données volumineuses sur un disque externe, et continue à utiliser tes apps comme avant.</strong></p>
   <p><em>plus de liberté face aux limites du stockage interne du Mac.</em></p>
   <p>macOS uniquement · CLI dans le Terminal · vérification des disques · aperçu avant transfert · restauration</p>

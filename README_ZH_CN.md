@@ -1,5 +1,5 @@
 <div align="center">
-  <h1 align="center"><img src="src/assets/ant.png" width="48" alt="🐜" align="absmiddle"> antmove</h1>
+  <h1 align="center"><img src="src/assets/ant.png" width="40" alt="🐜" align="absmiddle"> antmove</h1>
   <p><strong>把大型应用和数据搬到外置硬盘，应用照常使用。</strong></p>
   <p><em>不再被 Mac 内置存储空间束缚。</em></p>
   <p>仅支持 macOS · 终端 CLI · 硬盘适用性检查 · 迁移预览 · 支持恢复</p>
