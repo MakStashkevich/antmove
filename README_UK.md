@@ -1,5 +1,5 @@
 <div align="center">
-  <h1><img src="src/assets/ant.png" width="48" alt="🐜" align="middle"> antmove</h1>
+  <h1><img src="src/assets/ant.png" width="48" alt="🐜" align="absmiddle"> antmove</h1>
   <p><strong>перенось важкі програми й дані на зовнішній диск — і користуйся програмами як раніше.</strong></p>
   <p>більше свободи від обмежень вбудованого сховища Mac.</p>
   <p>лише macOS · робота в Terminal · перевірка дисків · попередній перегляд перенесення · відновлення даних</p>
