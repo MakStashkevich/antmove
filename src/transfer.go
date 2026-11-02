@@ -93,6 +93,9 @@ func moveItem(item Item, volume Volume, dryRun bool) (Operation, error) {
 	if err := ensureSafeDestinationParent(current.MountPath, filepath.Dir(finalPath)); err != nil {
 		return Operation{}, err
 	}
+	// Folder icons are cosmetic; some external filesystems cannot store them.
+	// Keep the transfer usable even when Finder cannot persist this metadata.
+	_ = setAntmoveFolderIcon(current.MountPath)
 	if err := diskStillMounted(*current); err != nil {
 		return Operation{}, err
 	}

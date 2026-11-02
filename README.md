@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>antmove</h1>
+  <h1><img src="src/assets/ant.png" width="48" alt="🐜"> antmove</h1>
   <p><strong>Move heavy apps and data to an external drive—and use your apps like before.</strong></p>
   <p>More freedom from your Mac’s built-in storage limits.</p>
   <p>macOS only · Terminal CLI · disk suitability checks · preview before moving · restore when needed</p>
