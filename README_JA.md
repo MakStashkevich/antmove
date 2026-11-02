@@ -1,5 +1,5 @@
 <div align="center">
-  <h1 align="center"><img src="src/assets/ant.png" width="40" alt="🐜" align="absmiddle"> antmove</h1>
+  <h1 align="center"><img src="src/assets/ant-readme.png" width="40" alt="🐜" align="absmiddle"> antmove</h1>
   <p><strong>重いアプリやデータを外付けディスクへ。アプリはこれまで通り使えます。</strong></p>
   <p><em>Mac本体のストレージ容量に縛られず、もっと自由に。</em></p>
   <p>macOS専用 · ターミナルCLI · ディスク適性チェック · 移動前プレビュー · 復元に対応</p>

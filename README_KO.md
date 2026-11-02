@@ -1,5 +1,5 @@
 <div align="center">
-  <h1 align="center"><img src="src/assets/ant.png" width="40" alt="🐜" align="absmiddle"> antmove</h1>
+  <h1 align="center"><img src="src/assets/ant-readme.png" width="40" alt="🐜" align="absmiddle"> antmove</h1>
   <p><strong>용량 큰 앱과 데이터를 외장 디스크로 옮기고, 앱은 평소처럼 사용하세요.</strong></p>
   <p><em>Mac 내장 저장 공간의 한계에서 더 자유롭게.</em></p>
   <p>macOS 전용 · 터미널 CLI · 디스크 적합성 확인 · 이동 미리보기 · 복원 지원</p>
