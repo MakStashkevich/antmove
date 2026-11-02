@@ -28,7 +28,7 @@ macOS와 앱은 원래 경로를 그대로 사용합니다. 무거운 파일은 
 - <code>/Applications</code>와 <code>~/Applications</code>의 앱.
 - 설치된 앱과 명확히 연결할 수 있는 대용량 데이터 폴더.
 - Xcode와 Apple 개발 데이터, Android SDK/AVD, 일부 개발 도구 데이터.
-- macOS가 허용하면 Photos 보관함, Music/iTunes 미디어, Apple TV 미디어/다운로드 폴더, iPhone/iPad 백업.
+- macOS가 허용하면 Photos 보관함, Apple Music 미디어, 실제로 남아 있는 기존 iTunes 폴더, Apple TV 미디어/다운로드 폴더, iPhone/iPad 백업.
 - 예전 Extender 이동 기록.
 
 Docker Desktop, OrbStack, Colima, Rancher Desktop 저장 공간도 제조사 안내와 함께 표시될 수 있습니다. 하지만 antmove는 엔진 내부 저장소를 직접 옮기지 않습니다. VM과 데이터베이스를 일반 폴더처럼 움직이면 엔진이 고장 날 수 있으니까요.
@@ -165,7 +165,7 @@ am disks --test "/Volumes/Work SSD"
 4. 메뉴에서 **Move data**를 골라 항목과 디스크를 지정하고, 경고를 읽은 다음 확인.
 5. 옮긴 데이터를 쓰는 동안 디스크 연결해 두기.
 
-antmove가 앱이나 컨테이너 엔진을 대신 종료하지는 않습니다. 앱이 열려 있으면 직접 닫고 다시 스캔하세요.
+관련 앱이 열려 있으면 대화형 메뉴에서 정상 종료 요청을 보낼지 별도로 확인합니다. CLI에서는 <code>--close-apps</code>를 사용할 수 있습니다. macOS가 Terminal에 Automation 권한을 요청할 수 있습니다. 강제 종료하거나 컨테이너 엔진/백그라운드 서비스를 중단하지 않습니다.
 
 <code>am scan</code>에서 나온 ID로 먼저 미리보기:
 
@@ -194,10 +194,13 @@ antmove는 여유 공간을 확인하고 macOS <code>ditto</code>로 임시 폴�
 - **Photos:** <code>.photoslibrary</code>를 옮기기 전에 Photos를 종료하세요. Apple은 APFS 또는 Mac OS Extended를 권장합니다. 이동 뒤 새 위치에서 보관함을 열고, iCloud Photos를 쓴다면 필요할 때 시스템 사진 보관함으로 지정하세요.
 - **Music:** 먼저 Music을 닫으세요. 이후 파일을 가져올 거라면 **Music → Settings → Files → Media Location**을 확인하세요. antmove는 설정을 바꾸지 않습니다.
 - **Apple TV:** TV를 닫으세요. 다운로드 영화에 DRM이 걸려 있을 수 있습니다. 옮긴 다음 재생이 되는지 보고, 볼 때 디스크를 연결해 두세요.
+- **Apple TV 경로:** <code>TV → Settings → Files</code>에 설정된 Media folder를 사용하며 기본값은 <code>~/Movies/TV/Media.localized</code>입니다. 상위 폴더 전체는 옮기지 않습니다. Apple이 다운로드 캐시의 고정 경로를 공개하지 않았으므로 실제로 있을 때만 알려진 캐시 경로를 표시합니다.
+- **실행 중인 앱 닫기:** 관련 앱이 실행 중이면 이동 전에 정상 종료 요청을 보낼지 별도로 확인합니다. CLI에서는 <code>--close-apps</code>를 사용합니다. macOS가 Terminal에 Automation 권한을 요청할 수 있습니다. 강제 종료, 저장되지 않은 작업 폐기, 백업/동기화/컨테이너 서비스 중단은 하지 않습니다.
 - **iPhone/iPad 백업:** 기본 경로는 <code>~/Library/Application Support/MobileSync/Backup</code>입니다. Finder 백업이나 동기화가 끝난 뒤 옮기세요. 접근 거부가 뜨면 <code>am</code>을 실행하는 터미널 앱에 Full Disk Access를 허용하고 다시 연 다음 재검사하세요.
+- **비어 있거나 아직 없는 폴더:** <code>am scan</code>은 Music, Photos, Apple TV, iPhone/iPad 백업의 표준 경로도 비어 있거나 아직 생성되지 않았더라도 보여 줍니다. <code>0 B</code> 항목도 옮길 수 있습니다. 확인하면 antmove가 필요할 때 원래 폴더를 만들고 외장 디스크로 향하는 링크를 둡니다. 이후 해당 경로로 저장되는 데이터는 외장 디스크에 기록됩니다. 먼저 관련 앱을 종료하고 백업이나 동기화가 끝났는지 확인하세요. Music은 Media Location이 링크된 폴더를 가리키는지 확인하세요. Photos 보관함은 앱이 관리하는 패키지입니다. 새 보관함은 Option 키를 누른 채 Photos를 열고 Create New로 만드세요. 빈 링크에서 Photos가 초기화하지 못하면 외장 디스크에 직접 만든 뒤 Photos에서 선택하세요. 기존 iTunes 폴더는 실제로 남아 있는 경우에만 표시합니다.
 - **Docker:** 엔진 자체의 이전 방법을 쓰세요. VM이나 데이터베이스 파일을 일반 폴더처럼 옮기는 건 권하지 않습니다.
 
-Apple 안내: [Photos 보관함 옮기기](https://support.apple.com/en-ie/108345) · [Music 파일 설정](https://support.apple.com/en-ca/guide/music/mus69248042d/mac) · [Apple TV 설정](https://support.apple.com/en-gb/guide/tvapp-mac/tv0f5accea/mac) · [iPhone 백업 찾기](https://support.apple.com/en-la/108809).
+Apple 안내: [Photos 보관함 옮기기](https://support.apple.com/en-ie/108345) · [Music 파일 설정](https://support.apple.com/en-ca/guide/music/mus69248042d/mac) · [Apple TV 설정](https://support.apple.com/guide/tvapp/files-settings-atvb5536de97/web) · [iPhone 백업 찾기](https://support.apple.com/en-la/108809).
 
 ## 원래대로 돌리고 싶을 때
 

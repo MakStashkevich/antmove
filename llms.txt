@@ -33,6 +33,10 @@ Run `am --version` to confirm installation. If the command is unavailable, reope
 - Caution-rated disks require two separate confirmations in the CLI. Read-only, network, system, and unavailable disks are not valid destinations.
 - Keep all destination disks connected while their moved data is in use.
 - Apple Photos/Music/TV and iPhone/iPad backups have app-specific requirements. macOS may require Full Disk Access for the terminal. Apple TV downloads may use DRM.
+- `am scan` lists supported standard Apple media and backup folders even when empty (`0 B`) or not yet created. A confirmed move creates the missing source folder and links it to the selected disk so later writes at that path can be stored externally. Quit the related app and finish backups/sync first. New Photos libraries are app-managed packages; use Photos' Option-open → Create New flow and heed Antmove's item note if Photos cannot initialize an empty linked location.
+- If an associated GUI app is active, the interactive move flow asks separately before sending a graceful quit request. The CLI equivalent is `--close-apps`; macOS may ask the requesting terminal app for Automation permission. Antmove never force-quits or discards unsaved work and never stops backup, sync, or container services.
+- On current macOS, Apple Music is the music app; show legacy iTunes paths only when those folders already exist. Do not suggest installing or using iTunes on a current Mac.
+- For Apple TV, read the configured Media folder from `TV > Settings > Files` (`~/Movies/TV/Media.localized` is the default on this Mac). Apple does not document a stable filesystem path for DRM-protected downloads, so list known app-managed download paths only when they exist; never show missing cache paths as empty future folders.
 - Antmove provides vendor guidance for Docker Desktop, OrbStack, Colima, and Rancher Desktop. It does not directly move their VM/database stores.
 - Recovery and uninstall change files/state. Run them only when requested and after explaining the effects.
 
@@ -45,6 +49,7 @@ Run `am --version` to confirm installation. If the command is unavailable, reope
 - `am disks`: inspect eligible external disks; `am disks --test PATH` measures speed
 - `am move --disk PATH --dry-run ID`: preview a transfer
 - `am move --disk PATH --yes ID`: perform a reviewed transfer to a recommended disk
+- `am move --disk PATH --yes --close-apps ID`: additionally authorize Antmove to request graceful quit of related GUI apps; macOS Automation permission may still be required
 - `am move --disk PATH --confirm-caution --confirm-caution ID`: acknowledge a caution-rated disk twice
 - `am restore --dry-run ID`: preview restore
 - `am restore --yes ID`: restore a selected item

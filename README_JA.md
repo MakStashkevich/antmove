@@ -28,7 +28,7 @@ macOSもアプリも、前から使っていたパスをそのまま使います
 - <code>/Applications</code> と <code>~/Applications</code> のアプリ。
 - インストール済みアプリと明確に関連付けられる大きなデータフォルダ。
 - Xcode/Apple開発データ、Android SDK/AVD、一部の開発ツールデータ。
-- macOSが許可すれば、Photosライブラリ、Music/iTunesメディア、Apple TVのメディア/ダウンロード、iPhone/iPadバックアップ。
+- macOSが許可すれば、Photosライブラリ、Apple Musicのメディア、存在する旧iTunesフォルダ、Apple TVのメディア/ダウンロード、iPhone/iPadバックアップ。
 - 昔のExtender移行記録。
 
 Docker Desktop、OrbStack、Colima、Rancher Desktopのストレージも、メーカーの案内つきで表示されます。でも、antmoveはエンジンの中身を直接移しません。VMやデータベースを普通のフォルダのように動かすと、壊れることがあるからです。
@@ -165,7 +165,7 @@ am disks --test "/Volumes/Work SSD"
 4. メニューの **Move data** を選び、項目とディスクを指定し、警告を読んで確認。
 5. 移したデータを使う間はディスクを接続しておく。
 
-antmoveはアプリやコンテナエンジンを勝手に終了しません。起動中なら自分で閉じて、もう一度スキャンしてください。
+関連アプリが起動中なら、対話メニューで通常終了要求を送るか個別に確認します。CLIでは<code>--close-apps</code>を使えます。macOSがTerminalにAutomation権限を求める場合があります。強制終了やコンテナエンジン/バックグラウンドサービスの停止はしません。
 
 <code>am scan</code>のIDでプレビューできます。
 
@@ -194,10 +194,13 @@ antmoveは空き容量を確認し、macOSの<code>ditto</code>で一時フォ�
 - **Photos:** <code>.photoslibrary</code>を移す前にPhotosを終了。AppleはAPFSまたはMac OS Extendedを推奨しています。移動後は新しい場所から開き、iCloud Photosなら必要に応じてシステムフォトライブラリに指定してください。
 - **Music:** Musicを終了してから移動。今後の読み込み先は **Music → Settings → Files → Media Location** で確認してください。antmoveはMusicの設定を変えません。
 - **Apple TV:** TVを終了。ダウンロードした映画にはDRMがあることがあります。移動後に再生を確認し、見るときはディスクを接続してください。
+- **Apple TVの場所:** <code>TV → Settings → Files</code>で設定されたMedia folderを使用します。既定値は<code>~/Movies/TV/Media.localized</code>です。親フォルダ全体は移動しません。ダウンロード用キャッシュの安定した場所はAppleが公開していないため、実在する場合のみ表示します。
+- **アプリの終了:** 関連アプリが起動中なら、移動前に通常の終了要求を送るか個別に確認します。CLIでは<code>--close-apps</code>を指定します。macOSがTerminalにAutomation権限を求める場合があります。強制終了、未保存データの破棄、バックアップ/同期/コンテナサービスの停止はしません。
 - **iPhone/iPadバックアップ:** 標準の場所は<code>~/Library/Application Support/MobileSync/Backup</code>です。Finderのバックアップや同期が終わってから移動。アクセス拒否なら、<code>am</code>を動かすTerminalなどにFull Disk Accessを付け、開き直して再スキャンしてください。
+- **空または未作成のフォルダ:** <code>am scan</code>はMusic、Photos、Apple TV、iPhone/iPadバックアップの標準パスを、空でも未作成でも表示します。<code>0 B</code>の項目も移動できます。確認後、antmoveが必要なら元のフォルダを作り、外部ディスクへのリンクを置きます。そのパスへの今後の書き込みは外部ディスクに保存されます。先に関連アプリを終了し、バックアップや同期が完了していることを確認してください。MusicのMedia Locationがリンク先を指しているか確認しましょう。Photosライブラリは管理されたパッケージです。新規作成はPhotosをOptionキーを押しながら起動し、「Create New」から行ってください。空のリンクから作れない場合は、外部ディスクに直接作成してPhotosで選択してください。旧iTunesのパスは、対応するフォルダが実在するときだけ表示します。
 - **Docker:** エンジンが用意している方法を使ってください。VMやデータベースのファイルを普通のフォルダのように動かすのはやめたほうがいいです。
 
-Appleの説明: [Photosライブラリを移動](https://support.apple.com/en-ie/108345) · [Musicのファイル設定](https://support.apple.com/en-ca/guide/music/mus69248042d/mac) · [Apple TVのファイル設定](https://support.apple.com/en-gb/guide/tvapp-mac/tv0f5accea/mac) · [iPhoneバックアップを探す](https://support.apple.com/en-la/108809)。
+Appleの説明: [Photosライブラリを移動](https://support.apple.com/en-ie/108345) · [Musicのファイル設定](https://support.apple.com/en-ca/guide/music/mus69248042d/mac) · [Apple TVのファイル設定](https://support.apple.com/guide/tvapp/files-settings-atvb5536de97/web) · [iPhoneバックアップを探す](https://support.apple.com/en-la/108809)。
 
 ## 元に戻したいとき
 

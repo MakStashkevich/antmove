@@ -10,7 +10,17 @@ import (
 )
 
 func directoryNeedsPrivilege(path string) bool {
-	return unix.Access(path, unix.W_OK) != nil
+	for current := filepath.Clean(path); ; current = filepath.Dir(current) {
+		if _, err := os.Stat(current); err == nil {
+			return unix.Access(current, unix.W_OK) != nil
+		} else if !os.IsNotExist(err) {
+			return unix.Access(current, unix.W_OK) != nil
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return true
+		}
+	}
 }
 
 func ensurePrivilege(path string, needed bool) error {

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -13,36 +14,41 @@ import (
 )
 
 type tuiModel struct {
-	page          string
-	items         []Item
-	operations    []Operation
-	volumes       []Volume
-	selectedItems map[string]bool
-	selectedOps   map[string]bool
-	cursor        int
-	volumeCursor  int
-	confirmStage  int
-	confirmText   string
-	search        string
-	searching     bool
-	busy          bool
-	loading       bool
-	loaded        bool
-	spinner       int
-	dryRun        bool
-	message       string
-	menuCursor    int
-	width         int
-	height        int
-	returnPage    string
-	quitAction    string
-	antOffset     int
-	antDirection  int
-	antPause      int
-	antWiggle     int
-	antWalkFrame  int
-	antHasBall    bool
-	antBallDrop   int
+	page            string
+	items           []Item
+	operations      []Operation
+	volumes         []Volume
+	selectedItems   map[string]bool
+	selectedOps     map[string]bool
+	cursor          int
+	volumeCursor    int
+	confirmStage    int
+	confirmText     string
+	closeActivities []activeActivity
+	pendingVolume   Volume
+	closeCanProceed bool
+	search          string
+	searching       bool
+	busy            bool
+	loading         bool
+	loaded          bool
+	spinner         int
+	dryRun          bool
+	message         string
+	resultTitle     string
+	resultLines     []string
+	menuCursor      int
+	width           int
+	height          int
+	returnPage      string
+	quitAction      string
+	antOffset       int
+	antDirection    int
+	antPause        int
+	antWiggle       int
+	antWalkFrame    int
+	antHasBall      bool
+	antBallDrop     int
 }
 
 type refreshMsg struct {
@@ -53,8 +59,12 @@ type refreshMsg struct {
 }
 
 type operationMsg struct {
-	message string
-	page    string
+	message          string
+	page             string
+	resultTitle      string
+	returnPage       string
+	operationUpdates []Operation
+	candidateUpdates []Item
 }
 
 type tickMsg time.Time
@@ -140,6 +150,16 @@ func (m tuiModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.page, m.message, m.busy = "uninstalled", msg.message, false
 			return m, nil
 		}
+		if msg.page == "operation-result" {
+			m.page, m.resultTitle = "operation-result", msg.resultTitle
+			m.resultLines, m.returnPage = strings.Split(msg.message, "\n"), msg.returnPage
+			m.message, m.busy, m.loading = "", false, false
+			m.cursor = 0
+			m.selectedItems, m.selectedOps = map[string]bool{}, map[string]bool{}
+			m.operations = mergeCachedOperations(m.operations, msg.operationUpdates)
+			m.items = applyCachedItemUpdates(m.items, msg.candidateUpdates)
+			return m, nil
+		}
 		m.message = msg.message
 		m.busy = false
 		if msg.page != "" {
@@ -149,8 +169,11 @@ func (m tuiModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		} else if m.page == "restoring" {
 			m.page = "restore"
 		}
-		m.loading = true
-		return m, tea.Batch(tickCommand(), refreshCommand())
+		m.loading = false
+		if msg.operationUpdates != nil {
+			m.operations = mergeCachedOperations(m.operations, msg.operationUpdates)
+		}
+		return m, nil
 	case tickMsg:
 		if m.page == "home" {
 			m.animateAnt()
@@ -165,7 +188,7 @@ func (m tuiModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
-		if m.busy {
+		if m.busy || (m.page == "operation-result" && m.loading) {
 			return m, nil
 		}
 		if m.searching {
@@ -204,7 +227,7 @@ func (m tuiModel) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m tuiModel) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	key := msg.String()
+	key := normalizeShortcutKey(msg.String())
 	switch m.page {
 	case "home":
 		switch key {
@@ -315,6 +338,27 @@ func (m tuiModel) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "confirm":
 		return m.updateConfirmation(msg)
+	case "close-confirm":
+		switch key {
+		case "q":
+			return m, tea.Quit
+		case "esc", "n":
+			m.page, m.message = "confirm", "Move cancelled. No apps were closed."
+		case "y", "enter":
+			if m.closeCanProceed {
+				return m.startMove(m.pendingVolume, true)
+			}
+		}
+	case "operation-result":
+		switch key {
+		case "enter", "esc":
+			m.page = nonempty(m.returnPage, "items")
+			m.resultTitle, m.resultLines, m.message = "", nil, ""
+			m.returnPage = ""
+			m.cursor = 0
+		case "q":
+			return m, tea.Quit
+		}
 	case "restore":
 		eligible := m.restorableOperations()
 		switch key {
@@ -333,15 +377,13 @@ func (m tuiModel) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		case "n":
 			m.selectedOps = map[string]bool{}
-		case "r":
+		case "r", "m":
 			if len(m.selectedOps) == 0 {
 				m.message = "Select at least one moved item first."
+			} else if m.dryRun {
+				m.message = "Dry run: selected items are ready to restore."
 			} else {
-				if m.dryRun {
-					m.message = "Dry run: selected items are ready to restore."
-				} else {
-					m.page, m.confirmStage = "restore-confirm", 0
-				}
+				m.page, m.confirmStage = "restore-confirm", 0
 			}
 		case "esc", "h":
 			m.page = "home"
@@ -386,10 +428,14 @@ func (m tuiModel) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if err != nil {
 					return operationMsg{message: "Recovery failed: " + err.Error(), page: returnPage}
 				}
-				if len(results) == 0 {
-					return operationMsg{message: "No interrupted operations need recovery.", page: returnPage}
+				operations, loadErr := loadOperations()
+				if loadErr != nil {
+					results = append(results, "Could not refresh cached operation history: "+loadErr.Error())
 				}
-				return operationMsg{message: strings.Join(results, "\n"), page: returnPage}
+				if len(results) == 0 {
+					return operationMsg{message: "No interrupted operations need recovery.", page: returnPage, operationUpdates: operations}
+				}
+				return operationMsg{message: strings.Join(results, "\n"), page: returnPage, operationUpdates: operations}
 			})
 		case "n", "esc":
 			m.page, m.message = nonempty(m.returnPage, "status"), "Recovery cancelled."
@@ -404,6 +450,83 @@ func (m tuiModel) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	return m, nil
+}
+
+// Bubble Tea receives characters from the terminal, not physical keycodes.
+// Normalize the standard Russian keyboard layout to the corresponding US
+// QWERTY key so shortcuts follow their physical key positions across layouts.
+func normalizeShortcutKey(key string) string {
+	key = strings.ToLower(key)
+	switch key {
+	case "й":
+		return "q"
+	case "ц":
+		return "w"
+	case "у":
+		return "e"
+	case "к":
+		return "r"
+	case "е":
+		return "t"
+	case "н":
+		return "y"
+	case "г":
+		return "u"
+	case "ш":
+		return "i"
+	case "щ":
+		return "o"
+	case "з":
+		return "p"
+	case "х":
+		return "["
+	case "ъ":
+		return "]"
+	case "ф":
+		return "a"
+	case "ы":
+		return "s"
+	case "в":
+		return "d"
+	case "а":
+		return "f"
+	case "п":
+		return "g"
+	case "р":
+		return "h"
+	case "о":
+		return "j"
+	case "л":
+		return "k"
+	case "д":
+		return "l"
+	case "ж":
+		return ";"
+	case "э":
+		return "'"
+	case "я":
+		return "z"
+	case "ч":
+		return "x"
+	case "с":
+		return "c"
+	case "м":
+		return "v"
+	case "и":
+		return "b"
+	case "т":
+		return "n"
+	case "ь":
+		return "m"
+	case "б":
+		return ","
+	case "ю":
+		return "."
+	case ".":
+		return "/"
+	default:
+		return key
+	}
 }
 
 func (m tuiModel) activateHomeOption(option int) (tea.Model, tea.Cmd) {
@@ -446,49 +569,34 @@ func (m tuiModel) activateHomeOption(option int) (tea.Model, tea.Cmd) {
 }
 
 func (m tuiModel) updateUninstallConfirmation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	key := msg.String()
-	if key == "esc" || key == "n" {
+	key := strings.ToLower(msg.String())
+	if key == "esc" {
 		m.page, m.message = "home", "Uninstall cancelled."
 		return m, nil
 	}
+	if key != "enter" {
+		return m, nil
+	}
 	if m.confirmStage == 0 {
-		if key == "y" || key == "enter" {
-			m.confirmStage = 1
-		}
+		m.confirmStage = 1
 		return m, nil
 	}
-	if key == "backspace" {
-		runes := []rune(m.confirmText)
-		if len(runes) > 0 {
-			m.confirmText = string(runes[:len(runes)-1])
+	m.page, m.busy = "uninstalling", true
+	m.message = "Removing antmove and its state."
+	return m, tea.Batch(tickCommand(), func() tea.Msg {
+		if err := performUninstall(); err != nil {
+			return operationMsg{message: "Uninstall failed: " + err.Error(), page: "home"}
 		}
-		return m, nil
-	}
-	if key == "enter" {
-		if m.confirmText != uninstallConfirmation {
-			m.confirmText = ""
-			m.message = "Confirmation did not match. Uninstall cancelled."
-			m.page = "home"
-			return m, nil
-		}
-		m.page, m.busy = "uninstalling", true
-		m.message = "Removing antmove and its state."
-		return m, tea.Batch(tickCommand(), func() tea.Msg {
-			if err := performUninstall(); err != nil {
-				return operationMsg{message: "Uninstall failed: " + err.Error(), page: "home"}
-			}
-			return operationMsg{message: "antmove and its data were removed. Press any key to exit.", page: "uninstalled"}
-		})
-	}
-	if len(msg.Runes) > 0 {
-		m.confirmText += string(msg.Runes)
-	}
-	return m, nil
+		return operationMsg{message: "antmove and its data were removed. Press any key to exit.", page: "uninstalled"}
+	})
 }
 
 func (m tuiModel) updateConfirmation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
-	if key == "esc" || key == "n" {
+	if m.confirmStage == 0 {
+		key = normalizeShortcutKey(key)
+	}
+	if key == "esc" || (m.confirmStage == 0 && key == "n") {
 		m.page, m.message = "disks", "Move cancelled."
 		return m, nil
 	}
@@ -499,7 +607,7 @@ func (m tuiModel) updateConfirmation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	volume := m.volumes[m.volumeCursor]
 	if volume.Rating != RatingCaution {
 		if key == "enter" || key == "y" {
-			return m.startMove(volume)
+			return m.requestMove(volume)
 		}
 		return m, nil
 	}
@@ -512,7 +620,7 @@ func (m tuiModel) updateConfirmation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if key == "enter" {
 		if m.confirmText == volume.Name {
-			return m.startMove(volume)
+			return m.requestMove(volume)
 		}
 		m.confirmText, m.message = "", "Disk name did not match; try again or press Esc."
 		return m, nil
@@ -530,7 +638,42 @@ func (m tuiModel) updateConfirmation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m tuiModel) startMove(volume Volume) (tea.Model, tea.Cmd) {
+func (m tuiModel) requestMove(volume Volume) (tea.Model, tea.Cmd) {
+	if m.dryRun {
+		return m.startMove(volume, false)
+	}
+	items := m.selectedItemList()
+	var activities []activeActivity
+	canProceed := true
+	seen := map[string]bool{}
+	for _, item := range items {
+		activity, active := activeActivityFor(item)
+		if !active {
+			continue
+		}
+		key := activity.BundleID
+		if key == "" {
+			key = activity.Name
+		}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		activities = append(activities, activity)
+		if !activity.CanQuit {
+			canProceed = false
+		}
+	}
+	if len(activities) == 0 {
+		return m.startMove(volume, false)
+	}
+	m.page, m.pendingVolume = "close-confirm", volume
+	m.closeActivities, m.closeCanProceed = activities, canProceed
+	m.message = ""
+	return m, nil
+}
+
+func (m tuiModel) startMove(volume Volume, closeApps bool) (tea.Model, tea.Cmd) {
 	items := m.selectedItemList()
 	if len(items) == 0 {
 		m.page, m.message = "items", "No eligible items selected."
@@ -547,18 +690,38 @@ func (m tuiModel) startMove(volume Volume) (tea.Model, tea.Cmd) {
 			}
 			defer unlock()
 		}
+		if closeApps && !dryRun {
+			if err := closeAppsForItems(items); err != nil {
+				return operationMsg{message: "FAILED before moving files: " + err.Error()}
+			}
+		}
 		var lines []string
+		operationUpdates := make([]Operation, 0, len(items))
+		candidateUpdates := make([]Item, 0, len(items))
 		for _, item := range items {
 			op, err := moveItem(item, volume, dryRun)
 			if err != nil {
 				lines = append(lines, "FAILED "+item.Name+": "+err.Error())
+				if op.ID != "" {
+					operationUpdates = append(operationUpdates, op)
+					if op.Phase == "completed" || op.Phase == "cleanup_pending" {
+						candidateUpdates = append(candidateUpdates, movedCandidate(item, op))
+					}
+				}
 			} else if dryRun {
 				lines = append(lines, "PREVIEW "+item.Name+" → "+op.DestinationPath)
 			} else {
 				lines = append(lines, "MOVED "+item.Name+" → "+op.DestinationPath)
+				operationUpdates = append(operationUpdates, op)
+				candidateUpdates = append(candidateUpdates, movedCandidate(item, op))
 			}
 		}
-		return operationMsg{message: strings.Join(lines, "\n")}
+		if dryRun {
+			return operationMsg{message: strings.Join(lines, "\n")}
+		}
+		return operationMsg{message: strings.Join(lines, "\n"), page: "operation-result",
+			resultTitle: operationResultTitle("Move", lines), returnPage: "items",
+			operationUpdates: operationUpdates, candidateUpdates: candidateUpdates}
 	})
 }
 
@@ -573,15 +736,125 @@ func (m tuiModel) startRestore() (tea.Model, tea.Cmd) {
 		}
 		defer unlock()
 		var results []string
-		for _, op := range operations {
+		candidateUpdates := make([]Item, 0, len(operations))
+		for i := range operations {
+			op := operations[i]
 			if err := restoreOperation(op); err != nil {
 				results = append(results, "FAILED "+op.Name+": "+err.Error())
 			} else {
 				results = append(results, "RESTORED "+op.Name)
+				op.Phase, op.Error, op.BackupPath, op.StagingPath = "restored", "", "", ""
+				operations[i] = op
 			}
 		}
-		return operationMsg{message: strings.Join(results, "\n")}
+		operationUpdates, err := loadOperations()
+		if err != nil {
+			results = append(results, "WARNING: could not update cached operation history: "+err.Error())
+			operationUpdates = operations
+		}
+		selected := make(map[string]bool, len(operations))
+		for _, op := range operations {
+			selected[op.ID] = true
+		}
+		for _, updated := range operationUpdates {
+			if selected[updated.ID] && (updated.Phase == "restored" || updated.Phase == "restoring_cleanup") {
+				candidateUpdates = append(candidateUpdates, restoredCandidate(updated))
+			}
+		}
+		return operationMsg{message: strings.Join(results, "\n"), page: "operation-result",
+			resultTitle: operationResultTitle("Restore", results), returnPage: "restore",
+			operationUpdates: operationUpdates, candidateUpdates: candidateUpdates}
 	})
+}
+
+func movedCandidate(item Item, op Operation) Item {
+	item.Status = StatusMoved
+	item.DestinationPath, item.VolumeUUID = op.DestinationPath, op.VolumeUUID
+	item.SizeBytes, item.Reason = op.SizeBytes, ""
+	return item
+}
+
+func restoredCandidate(op Operation) Item {
+	id := op.ItemID
+	if id == "" {
+		id = shortID(op.SourcePath)
+	}
+	item := Item{ID: id, Name: op.Name, Category: op.Category, SourcePath: op.SourcePath,
+		SizeBytes: op.SizeBytes, Status: StatusAvailable}
+	if info, err := os.Lstat(op.SourcePath); err == nil {
+		item.SourceFingerprint = fingerprint(info)
+	}
+	return item
+}
+
+func mergeCachedOperations(current, updates []Operation) []Operation {
+	if updates == nil {
+		return current
+	}
+	byID := make(map[string]Operation, len(current)+len(updates))
+	for _, op := range current {
+		byID[op.ID] = op
+	}
+	for _, op := range updates {
+		byID[op.ID] = op
+	}
+	merged := make([]Operation, 0, len(byID))
+	for _, op := range byID {
+		merged = append(merged, op)
+	}
+	sort.Slice(merged, func(i, j int) bool { return merged[i].CreatedAt.After(merged[j].CreatedAt) })
+	return merged
+}
+
+func applyCachedItemUpdates(current, updates []Item) []Item {
+	if len(updates) == 0 {
+		return current
+	}
+	byID := make(map[string]Item, len(current)+len(updates))
+	byPath := make(map[string]Item, len(current)+len(updates))
+	for _, item := range current {
+		byID[item.ID] = item
+		byPath[item.SourcePath] = item
+	}
+	for _, item := range updates {
+		old, exists := byID[item.ID]
+		if !exists {
+			old, exists = byPath[item.SourcePath]
+		}
+		if exists {
+			old.Status = item.Status
+			old.SizeBytes = item.SizeBytes
+			old.DestinationPath = item.DestinationPath
+			old.VolumeUUID = item.VolumeUUID
+			old.Reason = item.Reason
+			if item.SourceFingerprint != "" {
+				old.SourceFingerprint = item.SourceFingerprint
+			}
+			byID[old.ID] = old
+			byPath[old.SourcePath] = old
+			continue
+		}
+		if item.ID == "" {
+			item.ID = shortID(item.SourcePath)
+		}
+		byID[item.ID] = item
+		byPath[item.SourcePath] = item
+	}
+	merged := make([]Item, 0, len(byID))
+	for _, item := range byID {
+		merged = append(merged, item)
+	}
+	sortItems(merged)
+	return merged
+}
+
+func operationResultTitle(operation string, lines []string) string {
+	for _, line := range lines {
+		if strings.HasPrefix(line, "FAILED ") {
+			return operation + " finished with errors"
+		}
+	}
+	return operation + " completed successfully"
 }
 
 func refreshCommand() tea.Cmd {
@@ -752,7 +1025,8 @@ func (m tuiModel) View() string {
 		if len(items) == 0 && m.loaded {
 			b.WriteString("  No candidates found.\n")
 		}
-		start, end := visibleRange(m.cursor, len(items), maxInt(1, m.height-14))
+		// Reserve space for the brand header, selected-item details, and footer.
+		start, end := visibleRange(m.cursor, len(items), maxInt(1, m.height-23))
 		for i := start; i < end; i++ {
 			item := items[i]
 			marker := rowMarker(i == m.cursor, item.Status == StatusAvailable && m.selectedItems[item.ID])
@@ -808,6 +1082,31 @@ func (m tuiModel) View() string {
 				b.WriteString("\n  Ready to begin the transfer.\n")
 			}
 		}
+	case "close-confirm":
+		b.WriteString("\n  Close related apps before moving?\n\n")
+		if m.closeCanProceed {
+			b.WriteString("  Antmove will send a graceful quit request to:\n")
+			for _, activity := range m.closeActivities {
+				b.WriteString("    · " + activity.Name + "\n")
+			}
+			b.WriteString("\n  Apps can change files during a move and make verification fail.\n")
+			b.WriteString("  Antmove will not force-quit or discard unsaved work.\n")
+			b.WriteString("  macOS may ask permission to control these apps under Automation.\n")
+			b.WriteString("  Allow only if you want antmove to send the quit request.\n")
+		} else {
+			b.WriteString("  This activity is a system or background service:\n")
+			for _, activity := range m.closeActivities {
+				b.WriteString("    · " + activity.Name + "\n")
+			}
+			b.WriteString("\n  Antmove will not terminate services or interrupt backups.\n")
+			b.WriteString("  Finish the backup/task, then rescan.\n")
+		}
+	case "operation-result":
+		b.WriteString("\n  " + m.resultTitle + "\n\n")
+		for _, line := range m.resultLines {
+			b.WriteString("  " + line + "\n")
+		}
+		b.WriteString("\n  Press Enter to return to the list.\n")
 	case "moving", "restoring":
 		activity := "Moving selected data…"
 		if m.page == "restoring" {
@@ -878,9 +1177,9 @@ func (m tuiModel) View() string {
 	case "uninstall-confirm":
 		b.WriteString("\n  WARNING: antmove and its operation history will be permanently removed.\n  Moved apps will not be restored; their original paths remain symbolic links.\n  Keep their disks connected or restore them before uninstalling.\n\n")
 		if m.confirmStage == 0 {
-			b.WriteString("  First confirmation required.\n")
+			b.WriteString("  First confirmation: press Enter to continue.\n")
 		} else {
-			b.WriteString(fmt.Sprintf("  Type %q to confirm.\n  > %s█\n", uninstallConfirmation, m.confirmText))
+			b.WriteString("  Final confirmation: press Enter to permanently uninstall antmove.\n")
 		}
 	case "uninstalling":
 		b.WriteString(fmt.Sprintf("\n  %s Removing antmove and its state…\n", spinnerFrame(m.spinner)))
@@ -921,6 +1220,8 @@ func styleTerminalView(view, page string, logo []string, antOffset, textStart in
 			}
 		case strings.Contains(line, " · disk connected") || strings.Contains(line, " · disk offline"):
 			lines[i] = styleRestoreDiskStatusLine(line)
+		case page == "items" && strings.Contains(line, " moved "):
+			lines[i] = tuiSuccessStyle.Render(line)
 		case headingPending && strings.TrimSpace(line) != "" && strings.Trim(line, "─") != "":
 			lines[i] = tuiHeadingStyle.Render(line)
 			headingPending = false
@@ -972,35 +1273,47 @@ func (m tuiModel) controlsLine() string {
 	case "home":
 		controls = "↑/↓ move  ·  Enter select  ·  M more  ·  V version  ·  Q quit"
 	case "items":
-		controls = "↑/↓ move  ·  Space select  ·  A all  ·  N none  ·  / filter  ·  M move  ·  D disks  ·  Esc back  ·  Q quit"
+		controls = "↑/↓ move  ·  Space select  ·  A all  ·  N none  ·  / filter  ·  M move  ·  D disks  ·  R restore  ·  S status  ·  Esc back  ·  Q quit"
 	case "disks":
 		controls = "↑/↓ move  ·  Enter select  ·  T speed test  ·  Esc back  ·  Q quit"
 	case "confirm":
 		if m.confirmStage == 1 {
 			controls = "Type disk name  ·  Enter confirm  ·  Esc cancel"
 		} else {
-			controls = "Y/Enter confirm  ·  Esc cancel"
+			controls = "Enter confirm  ·  Esc cancel"
+		}
+	case "close-confirm":
+		if m.closeCanProceed {
+			controls = "Enter allow quit & move  ·  Esc cancel"
+		} else {
+			controls = "Esc back  ·  Q quit"
+		}
+	case "operation-result":
+		if m.loading {
+			controls = spinnerFrame(m.spinner) + " Refreshing lists…"
+		} else {
+			controls = "Enter/Esc return to list  ·  Q quit"
 		}
 	case "restore":
-		controls = "↑/↓ move  ·  Space select  ·  A all  ·  N none  ·  R restore  ·  Esc back  ·  Q quit"
+		controls = "↑/↓ move  ·  Space select  ·  A all  ·  N none  ·  M restore  ·  Esc back  ·  Q quit"
 	case "restore-confirm":
-		controls = "Y/Enter restore  ·  Esc cancel"
+		controls = "Enter restore  ·  Esc cancel"
 	case "status":
 		controls = "↑/↓ move  ·  R recover  ·  Esc back  ·  Q quit"
 	case "recover-confirm":
-		controls = "Y/Enter recover  ·  Esc cancel"
+		controls = "Enter recover  ·  Esc cancel"
 	case "uninstall-confirm":
 		if m.confirmStage == 1 {
-			controls = "Type confirmation  ·  Enter uninstall  ·  Esc cancel"
+			controls = "Enter uninstall  ·  Esc cancel"
 		} else {
-			controls = "Y/Enter continue  ·  Esc cancel"
+			controls = "Enter continue  ·  Esc cancel"
 		}
 	case "uninstalled":
 		controls = "Press any key to exit"
 	default:
 		controls = "Q quit"
 	}
-	if m.loading && m.loaded {
+	if m.loading && m.loaded && m.page != "operation-result" {
 		controls += fmt.Sprintf("  ·  %s refreshing", spinnerFrame(m.spinner))
 	}
 	return controls
@@ -1097,7 +1410,14 @@ func (m *tuiModel) toggleCurrentItem() {
 	}
 	item := items[m.cursor]
 	if item.Status != StatusAvailable {
-		m.message = "This item cannot be moved: " + item.Reason
+		switch item.Status {
+		case StatusMoved:
+			m.message = "This item has already been moved to external storage. Use Restore to bring it back."
+		case StatusDiskOffline:
+			m.message = "This item was already moved, but its destination disk is unavailable. Connect the disk to use or restore it."
+		default:
+			m.message = "This item cannot be moved: " + item.Reason
+		}
 		return
 	}
 	m.selectedItems[item.ID] = !m.selectedItems[item.ID]

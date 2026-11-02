@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -36,20 +38,31 @@ func moveItem(item Item, volume Volume, dryRun bool) (Operation, error) {
 		return Operation{}, fmt.Errorf("source path or one of its parents is a symbolic link")
 	}
 	sourceInfo, err := os.Lstat(item.SourcePath)
-	if err != nil || sourceInfo.Mode()&os.ModeSymlink != 0 {
+	sourceMissing := os.IsNotExist(err)
+	canCreateMissingSource := item.CreateWhenMissing && item.SourceFingerprint == ""
+	if sourceMissing && !canCreateMissingSource {
+		return Operation{}, fmt.Errorf("source no longer exists; scan again before moving it")
+	}
+	if !sourceMissing && canCreateMissingSource {
+		return Operation{}, fmt.Errorf("source appeared after the scan; scan again before moving it")
+	}
+	if (err != nil && !sourceMissing) || (!sourceMissing && sourceInfo.Mode()&os.ModeSymlink != 0) {
 		return Operation{}, fmt.Errorf("source is no longer an ordinary file or directory")
 	}
-	if item.SourceFingerprint != "" && fingerprint(sourceInfo) != item.SourceFingerprint {
+	if !sourceMissing && item.SourceFingerprint != "" && fingerprint(sourceInfo) != item.SourceFingerprint {
 		return Operation{}, fmt.Errorf("source changed since the last scan; scan again before moving it")
 	}
-	if err := activeProcessFor(item); err != nil {
-		return Operation{}, err
-	}
-	currentSize, err := allocatedSize(item.SourcePath)
-	if err != nil {
-		return Operation{}, fmt.Errorf("measure source before transfer: %w", err)
+	var currentSize int64
+	if !sourceMissing {
+		currentSize, err = allocatedSize(item.SourcePath)
+		if err != nil {
+			return Operation{}, fmt.Errorf("measure source before transfer: %w", err)
+		}
 	}
 	needed := requiredCapacity(currentSize)
+	if item.CreateWhenMissing && currentSize == 0 {
+		needed = 0
+	}
 	currentVolumes, err := scanVolumes()
 	if err != nil {
 		return Operation{}, err
@@ -83,6 +96,9 @@ func moveItem(item Item, volume Volume, dryRun bool) (Operation, error) {
 	if err := diskStillMounted(*current); err != nil {
 		return Operation{}, err
 	}
+	if activity, ok := activeActivityFor(item); ok {
+		return Operation{}, activityError(item, activity)
+	}
 	id := randomID()
 	staging := filepath.Join(filepath.Dir(finalPath), ".antmove-staging-"+id)
 	backup := filepath.Join(filepath.Dir(item.SourcePath), ".antmove-backup-"+id)
@@ -94,6 +110,39 @@ func moveItem(item Item, volume Volume, dryRun bool) (Operation, error) {
 	}
 	if err := saveOperation(op); err != nil {
 		return Operation{}, err
+	}
+	if sourceMissing {
+		if hasSymlinkAncestor(item.SourcePath) {
+			op.Phase, op.Error = "failed", "source path or one of its parents became a symbolic link"
+			_ = saveOperation(op)
+			return op, fmt.Errorf("source path or one of its parents became a symbolic link")
+		}
+		if _, err := os.Lstat(item.SourcePath); err == nil {
+			op.Phase, op.Error = "failed", "source appeared after the scan; no files were moved"
+			_ = saveOperation(op)
+			return op, fmt.Errorf("source appeared after the scan; scan again before moving it")
+		} else if !os.IsNotExist(err) {
+			op.Phase, op.Error = "failed", err.Error()
+			_ = saveOperation(op)
+			return op, fmt.Errorf("check source path before creating it: %w", err)
+		}
+		if err := os.MkdirAll(filepath.Dir(item.SourcePath), 0o755); err != nil {
+			op.Phase, op.Error = "failed", err.Error()
+			_ = saveOperation(op)
+			return op, fmt.Errorf("create source parent directory: %w", err)
+		}
+		if err := os.Mkdir(item.SourcePath, 0o755); err != nil {
+			op.Phase, op.Error = "failed", err.Error()
+			_ = saveOperation(op)
+			return op, fmt.Errorf("create empty source directory: %w", err)
+		}
+		sourceInfo, err = os.Lstat(item.SourcePath)
+		if err != nil {
+			op.Phase, op.Error = "failed", err.Error()
+			_ = saveOperation(op)
+			return op, fmt.Errorf("inspect new source directory: %w", err)
+		}
+		item.SourceFingerprint = fingerprint(sourceInfo)
 	}
 
 	op.Phase = "copying"
@@ -233,8 +282,12 @@ func restoreOperation(op Operation) error {
 		return fmt.Errorf("check local free space: %w", err)
 	}
 	freeBytes := int64(stats.Bavail * uint64(stats.Bsize))
-	if freeBytes < requiredCapacity(currentSize) {
-		return fmt.Errorf("not enough local free space to restore %s (need %s, have %s)", op.Name, formatBytes(requiredCapacity(currentSize)), formatBytes(freeBytes))
+	needed := requiredCapacity(currentSize)
+	if currentSize == 0 {
+		needed = 0
+	}
+	if freeBytes < needed {
+		return fmt.Errorf("not enough local free space to restore %s (need %s, have %s)", op.Name, formatBytes(needed), formatBytes(freeBytes))
 	}
 	stage := filepath.Join(parent, ".antmove-restore-"+op.ID)
 	if _, err := os.Lstat(stage); err == nil {
@@ -658,83 +711,204 @@ func diskStillMounted(expected Volume) error {
 	return nil
 }
 
-func activeProcessFor(item Item) error {
+type activeActivity struct {
+	Name     string
+	BundleID string
+	CanQuit  bool
+}
+
+func activeActivityFor(item Item) (activeActivity, bool) {
 	output, err := commandOutput("/bin/ps", "-axo", "pid=,command=")
 	if err != nil {
-		return nil
+		return activeActivity{}, false
+	}
+	identity := appIdentityFor(item)
+	if strings.EqualFold(filepath.Ext(item.SourcePath), ".app") {
+		identity = readAppIdentity(item.SourcePath)
 	}
 	needles := []string{}
-	if strings.HasSuffix(strings.ToLower(item.SourcePath), ".app") {
-		needles = append(needles, filepath.Base(item.SourcePath)+"/Contents/MacOS")
-	}
-	var ownerLabels []string
-	if item.Owner != "" {
-		ownerLabels = append(ownerLabels, item.Owner)
-	}
 	switch item.Category {
 	case CategoryDeveloper:
 		needles = append(needles, "xcodebuild", "Simulator.app", "Android Studio", "sdkmanager", "emulator")
 	case CategoryContainer:
 		needles = append(needles, "com.docker.backend", "OrbStack", "colima", "lima", "rancher-desktop")
 	case CategoryAppleBackup:
-		needles = append(needles, "AMPDevicesAgent", "MobileDeviceUpdater", "MobileBackup")
+		// These background agents can be idle while no backup is running.
+		needles = append(needles, "MobileBackup")
 	}
 	for _, line := range strings.Split(string(output), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 2 || fields[0] == fmt.Sprint(os.Getpid()) {
+		trimmed := strings.TrimSpace(line)
+		separator := strings.IndexAny(trimmed, " \t")
+		if separator < 0 || trimmed[:separator] == fmt.Sprint(os.Getpid()) {
 			continue
 		}
-		commandFields := fields[1:]
-		binary := strings.ToLower(filepath.Base(commandFields[0]))
+		processCommand := strings.TrimSpace(trimmed[separator:])
+		if processCommand == "" {
+			continue
+		}
+		processExecutable := processExecutablePath(processCommand)
+		lowerExecutable := strings.ToLower(processExecutable)
+		appExecutablePath := ""
+		if identity.Path != "" {
+			appExecutablePath = strings.ToLower(filepath.Join(identity.Path, "Contents", "MacOS")) + string(os.PathSeparator)
+		}
+		if appExecutablePath != "" && strings.HasPrefix(lowerExecutable, appExecutablePath) && identity.BundleID != "" {
+			name := identity.Name
+			if name == "" {
+				name = item.Name
+			}
+			return activeActivity{Name: name, BundleID: identity.BundleID, CanQuit: true}, true
+		}
+		binary := filepath.Base(processExecutable)
 		if binary == "zsh" || binary == "bash" || binary == "sh" {
 			continue
 		}
-		filtered := make([]string, 0, len(commandFields))
-		for _, field := range commandFields {
-			if strings.Contains(field, "=") && !strings.HasPrefix(field, "-") {
-				continue
-			}
-			filtered = append(filtered, field)
-		}
-		command := strings.ToLower(strings.Join(filtered, " "))
-		for _, owner := range ownerLabels {
-			if containsProcessLabel(command, owner) {
-				return fmt.Errorf("close the related application or service before moving %s", item.Name)
-			}
+		if identity.BundleID != "" && identity.Executable != "" && identity.Path == "" && strings.EqualFold(binary, identity.Executable) {
+			return activeActivity{Name: identity.Name, BundleID: identity.BundleID, CanQuit: true}, true
 		}
 		for _, needle := range needles {
-			if needle != "" && strings.Contains(command, strings.ToLower(needle)) {
-				return fmt.Errorf("close the related application or service before moving %s", item.Name)
+			if needle != "" && strings.Contains(lowerExecutable, strings.ToLower(needle)) {
+				return activeActivity{Name: needle}, true
 			}
 		}
+	}
+	return activeActivity{}, false
+}
+
+func processExecutablePath(processCommand string) string {
+	lower := strings.ToLower(processCommand)
+	marker := ".app/contents/macos/"
+	if index := strings.Index(lower, marker); index >= 0 {
+		end := index + len(marker)
+		if space := strings.IndexAny(processCommand[end:], " \t"); space >= 0 {
+			return processCommand[:end+space]
+		}
+		return processCommand
+	}
+	if space := strings.IndexAny(processCommand, " \t"); space >= 0 {
+		return processCommand[:space]
+	}
+	return processCommand
+}
+
+func activeProcessFor(item Item) error {
+	if activity, ok := activeActivityFor(item); ok {
+		return fmt.Errorf("related app or process %s is active; close it safely before continuing", activity.Name)
 	}
 	return nil
 }
 
-func containsProcessLabel(command, label string) bool {
-	command, label = strings.ToLower(command), strings.ToLower(strings.TrimSpace(label))
-	if label == "" {
-		return false
+func activityError(item Item, activity activeActivity) error {
+	if activity.CanQuit {
+		return fmt.Errorf("%s is running. Review the warning and use the interactive close-app confirmation or --close-apps to let antmove request permission to quit it", activity.Name)
 	}
-	for offset := 0; offset < len(command); {
-		index := strings.Index(command[offset:], label)
-		if index < 0 {
-			return false
-		}
-		index += offset
-		end := index + len(label)
-		beforeOK := index == 0 || !isProcessNameByte(command[index-1])
-		afterOK := end == len(command) || !isProcessNameByte(command[end])
-		if beforeOK && afterOK {
-			return true
-		}
-		offset = end
-	}
-	return false
+	return fmt.Errorf("related process %s is active. Finish its work and rescan before moving %s; antmove will not terminate background services", activity.Name, item.Name)
 }
 
-func isProcessNameByte(value byte) bool {
-	return value >= 'a' && value <= 'z' || value >= '0' && value <= '9'
+func appIdentityFor(item Item) appIdentity {
+	if strings.EqualFold(filepath.Ext(item.SourcePath), ".app") {
+		return readAppIdentity(item.SourcePath)
+	}
+	owner := strings.ToLower(item.Owner)
+	if owner == "" {
+		switch normalizeAppName(item.Name) {
+		case "applemusicmedia":
+			owner = "music"
+		case "appletvmedia", "appletvdownloads":
+			owner = "tv"
+		case "photoslibrarydefault":
+			owner = "photos"
+		}
+		if strings.EqualFold(filepath.Ext(item.SourcePath), ".photoslibrary") {
+			owner = "photos"
+		}
+	}
+	switch owner {
+	case "music":
+		return appIdentity{Name: "Music", BundleID: "com.apple.Music", Executable: "Music", Path: "/System/Applications/Music.app"}
+	case "tv":
+		return appIdentity{Name: "TV", BundleID: "com.apple.TV", Executable: "TV", Path: "/System/Applications/TV.app"}
+	case "photos":
+		return appIdentity{Name: "Photos", BundleID: "com.apple.Photos", Executable: "Photos", Path: "/System/Applications/Photos.app"}
+	}
+	if item.Owner == "" {
+		return appIdentity{}
+	}
+	home, _ := os.UserHomeDir()
+	for _, root := range []string{"/Applications", "/System/Applications", filepath.Join(home, "Applications")} {
+		entries, err := os.ReadDir(root)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if !strings.HasSuffix(strings.ToLower(entry.Name()), ".app") {
+				continue
+			}
+			appPath := filepath.Join(root, entry.Name())
+			identity := readAppIdentity(appPath)
+			if normalizeAppName(identity.Name) == normalizeAppName(item.Owner) || normalizeAppName(strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))) == normalizeAppName(item.Owner) {
+				return identity
+			}
+		}
+	}
+	return appIdentity{}
+}
+
+func quitApplication(activity activeActivity) error {
+	if !activity.CanQuit || activity.BundleID == "" {
+		return fmt.Errorf("%s cannot be quit safely by antmove", activity.Name)
+	}
+	script := fmt.Sprintf("tell application id %q to quit", activity.BundleID)
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "/usr/bin/osascript", "-e", script)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		if ctx.Err() != nil {
+			return fmt.Errorf("timed out waiting for %s to quit; it may need attention to save work. no files were moved", activity.Name)
+		}
+		return fmt.Errorf("could not get a graceful quit from %s; it may be waiting for unsaved-work confirmation, or macOS may have denied Automation permission. no files were moved. if denied, allow the requesting app under System Settings > Privacy & Security > Automation, then retry: %s", activity.Name, strings.TrimSpace(string(output)))
+	}
+	return nil
+}
+
+func closeAppsForItems(items []Item) error {
+	type target struct {
+		item     Item
+		activity activeActivity
+	}
+	targets := make([]target, 0, len(items))
+	seen := map[string]bool{}
+	for _, item := range items {
+		activity, active := activeActivityFor(item)
+		if !active {
+			continue
+		}
+		if !activity.CanQuit {
+			return activityError(item, activity)
+		}
+		if !seen[activity.BundleID] {
+			seen[activity.BundleID] = true
+			targets = append(targets, target{item: item, activity: activity})
+		}
+	}
+	for _, target := range targets {
+		if err := quitApplication(target.activity); err != nil {
+			return err
+		}
+	}
+	for _, target := range targets {
+		deadline := time.Now().Add(10 * time.Second)
+		for time.Now().Before(deadline) {
+			if _, active := activeActivityFor(target.item); !active {
+				break
+			}
+			time.Sleep(250 * time.Millisecond)
+		}
+		if activity, active := activeActivityFor(target.item); active {
+			return fmt.Errorf("%s is still active; no files were moved", activity.Name)
+		}
+	}
+	return nil
 }
 
 func randomID() string {

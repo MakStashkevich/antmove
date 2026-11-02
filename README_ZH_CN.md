@@ -28,7 +28,7 @@ macOS 和应用继续用之前的路径，实际文件存放在已连接的外�
 - <code>/Applications</code> 和 <code>~/Applications</code> 里的应用；
 - 能明确匹配到已安装应用的大型数据目录；
 - Xcode 和 Apple 开发数据、Android SDK/AVD，以及部分开发工具数据；
-- macOS 允许访问时的 Photos 照片图库、Music/iTunes 媒体、Apple TV 媒体/下载目录和 iPhone/iPad 备份；
+- macOS 允许访问时的 Photos 照片图库、Apple Music 媒体、现存的旧 iTunes 文件夹、Apple TV 媒体/下载目录和 iPhone/iPad 备份；
 - 旧 Extender 的迁移记录。
 
 Docker Desktop、OrbStack、Colima 和 Rancher Desktop 的数据也可能出现，并附有厂商建议。但 antmove 不会直接移动这些引擎的内部存储。里面有虚拟机和数据库，普通地挪文件夹可能把引擎弄坏。
@@ -165,7 +165,7 @@ am disks --test "/Volumes/Work SSD"
 4. 在菜单里选 **Move data**，标记项目、选磁盘、读完警告再确认；
 5. 用这些数据时，别把外置盘拔掉。
 
-antmove 不会帮你关应用或容器引擎。如果应用还开着，自己关掉再扫描一次。
+如果相关应用仍在运行，交互菜单会单独询问是否向它发送正常退出请求；CLI 可用 <code>--close-apps</code>。macOS 可能会要求终端获得自动化权限。Antmove 不会强制退出应用，也不会停止容器引擎或后台服务。
 
 先用 <code>am scan</code> 输出的 ID 看计划：
 
@@ -194,10 +194,13 @@ antmove 会检查剩余空间，用 macOS 的 <code>ditto</code> 复制到临时
 - **Photos：**移动 <code>.photoslibrary</code> 前先退出 Photos。Apple 推荐 APFS 或 Mac OS Extended。移动后从新位置打开图库；如果使用 iCloud Photos，必要时把它设成系统照片图库。
 - **Music：**退出 Music。移动后看看 **Music → Settings → Files → Media Location**，特别是之后还会导入文件的话。antmove 不改 Music 设置。
 - **Apple TV：**先退出 TV。下载的电影可能有 DRM。移动后试播一下，观看时保持磁盘连接。
+- **Apple TV 路径：**使用 <code>TV → Settings → Files</code> 中设置的 Media folder，默认是 <code>~/Movies/TV/Media.localized</code>。不会移动整个上级文件夹。Apple 没有公布稳定的下载缓存路径，因此只在已存在时显示已知缓存目录。
+- **关闭正在运行的应用：**若相关应用仍在运行，Antmove 会单独询问是否发送正常退出请求。CLI 使用 <code>--close-apps</code>。macOS 可能要求终端在“系统设置 → 隐私与安全性 → 自动化”获得控制权限。Antmove 不会强制退出应用、丢弃未保存内容，也不会停止备份、同步或容器服务。
 - **iPhone/iPad 备份：**默认位置是 <code>~/Library/Application Support/MobileSync/Backup</code>。等 Finder 备份/同步结束再搬。如果 macOS 拒绝访问，给运行 <code>am</code> 的终端应用 Full Disk Access，重新打开后再扫描。
+- **空文件夹或尚未创建的目录：**<code>am scan</code> 也会列出 Music、Photos、Apple TV 和 iPhone/iPad 备份的标准位置，即使它们为空或还不存在。<code>0 B</code> 的项目也能迁移：确认后 antmove 会按需创建原目录，并把它链接到外置磁盘。之后通过这个路径写入的数据就可以直接存到外置盘。操作前先退出相关应用，并等备份或同步结束。Music 要确认 Media Location 指向这个链接目录。Photos 图库是应用管理的专用包；新建图库请按住 Option 打开 Photos，选择 Create New。如果 Photos 无法在空链接位置初始化图库，就直接在外置盘创建，再从 Photos 中选择它。旧 iTunes 路径只会在相应文件夹确实存在时显示。
 - **Docker：**走引擎自己的迁移方式。虚拟机或数据库文件别当普通文件夹拖来拖去，我不会这么做。
 
-Apple 说明：[移动 Photos 图库](https://support.apple.com/en-ie/108345) · [Music 文件设置](https://support.apple.com/en-ca/guide/music/mus69248042d/mac) · [Apple TV 文件设置](https://support.apple.com/en-gb/guide/tvapp-mac/tv0f5accea/mac) · [查找 iPhone 备份](https://support.apple.com/en-la/108809)。
+Apple 说明：[移动 Photos 图库](https://support.apple.com/en-ie/108345) · [Music 文件设置](https://support.apple.com/en-ca/guide/music/mus69248042d/mac) · [Apple TV 文件设置](https://support.apple.com/guide/tvapp/files-settings-atvb5536de97/web) · [查找 iPhone 备份](https://support.apple.com/en-la/108809)。
 
 ## 要是想放回去
 

@@ -140,6 +140,7 @@ func runMove(args []string) error {
 	disk := fs.String("disk", "", "destination volume mount path")
 	dryRun := fs.Bool("dry-run", false, "show the transfer plan without changing files")
 	yes := fs.Bool("yes", false, "confirm a transfer on a recommended disk")
+	closeApps := fs.Bool("close-apps", false, "allow antmove to ask macOS to quit related apps after confirmation")
 	var cautionConfirm countFlag
 	fs.Var(&cautionConfirm, "confirm-caution", "acknowledge a non-recommended disk (repeat twice)")
 	if err := fs.Parse(args); err != nil {
@@ -193,6 +194,12 @@ func runMove(args []string) error {
 		return err
 	}
 	defer unlock()
+	if *closeApps && !*dryRun {
+		fmt.Println("If a related app is open, antmove will request a graceful quit. macOS may ask the terminal for Automation permission; denial cancels before any files are moved.")
+		if err := closeAppsForItems(selected); err != nil {
+			return err
+		}
+	}
 	for _, item := range selected {
 		op, err := moveItem(item, *volume, *dryRun)
 		if err != nil {
@@ -441,6 +448,7 @@ func printHelp() {
 		{"--disk PATH", "Destination mount path for am move"},
 		{"--dry-run", "Preview a move or restore without changing files"},
 		{"--yes", "Confirm a recommended-disk move or restore"},
+		{"--close-apps", "Allow quitting related apps after explicit confirmation"},
 		{"--confirm-caution", "Acknowledge a caution disk; repeat twice"},
 		{"--test PATH", "Measure read and write speed for a disk"},
 		{"[ID…]", "Limit move or restore to selected items; omit for menu"},
@@ -450,6 +458,7 @@ func printHelp() {
 		{"am scan", "List available candidates"},
 		{"am disks --test /Volumes/WorkSSD", "Measure external-disk speed"},
 		{"am move --disk /Volumes/WorkSSD --dry-run ID", "Preview a transfer"},
+		{"am move --disk /Volumes/WorkSSD --yes --close-apps ID", "Move and allow graceful app quit if needed"},
 		{"am restore --dry-run ID", "Preview a restore"},
 		{"am migrate --dry-run", "Preview Extender path migration"},
 	})

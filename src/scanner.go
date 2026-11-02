@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,8 +21,10 @@ const unassignedMinimumBytes int64 = 256 * 1024 * 1024
 const candidateMinimumBytes int64 = 128 * 1024 * 1024
 
 type appIdentity struct {
-	Name     string
-	BundleID string
+	Name       string
+	BundleID   string
+	Executable string
+	Path       string
 }
 
 func scanItems() ([]Item, error) {
@@ -90,32 +93,40 @@ func scanAppleMediaData(home string, associated map[string]bool, items map[strin
 					continue
 				}
 				name := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
-				if item, ok := makeItemAtLeast(path, name, CategoryAppleMedia, "Photos", bySource, candidateMinimumBytes); ok {
-					item.Reason = "Apple Photos library. Quit Photos before moving. Apple recommends APFS or Mac OS Extended; after moving, open the library on the external disk and select it as the System Photo Library if you use iCloud Photos."
-					items[path] = item
-					associated[path] = true
-				}
+				addAppleManagedCandidate(path, name, CategoryAppleMedia, "Photos",
+					"Apple Photos library. Quit Photos before moving. Apple recommends APFS or Mac OS Extended; after moving, open the library on the external disk and select it as the System Photo Library if you use iCloud Photos.",
+					associated, items, bySource)
 			}
 		}
 	}
+	defaultPhotosPath := filepath.Join(pictures, "Photos Library.photoslibrary")
+	if _, exists := items[defaultPhotosPath]; !exists {
+		addAppleManagedCandidate(defaultPhotosPath, "Photos Library (default)", CategoryAppleMedia, "Photos",
+			"Default Apple Photos library location. Quit Photos before moving. Apple recommends APFS or Mac OS Extended; after moving, open the library on the external disk and select it as the System Photo Library if you use iCloud Photos. For a new library, Photos may need to create it through its Option-open > Create New workflow.",
+			associated, items, bySource)
+	}
 
 	musicCandidates := []struct {
-		path string
-		name string
+		path   string
+		name   string
+		legacy bool
 	}{
-		{filepath.Join(home, "Music", "Music", "Media"), "Apple Music Media"},
-		{filepath.Join(home, "Music", "iTunes", "iTunes Media"), "iTunes Media"},
-		{filepath.Join(home, "Music", "iTunes", "iTunes Music"), "iTunes Music"},
+		{path: appleMusicMediaFolder(home), name: "Apple Music Media"},
+		{path: filepath.Join(home, "Music", "iTunes", "iTunes Media"), name: "Legacy iTunes Media", legacy: true},
+		{path: filepath.Join(home, "Music", "iTunes", "iTunes Music"), name: "Legacy iTunes Music", legacy: true},
 	}
 	for _, candidate := range musicCandidates {
-		if hasSymlinkParent(candidate.path) {
-			continue
+		if candidate.legacy {
+			if _, err := os.Lstat(candidate.path); os.IsNotExist(err) {
+				continue
+			}
 		}
-		if item, ok := makeItemAtLeast(candidate.path, candidate.name, CategoryAppleMedia, "Music", bySource, candidateMinimumBytes); ok {
-			item.Reason = "Apple Music media folder. Quit Music before moving. For future imports, check Music > Settings > Files > Media Location; keep the external disk connected while using this library."
-			items[candidate.path] = item
-			associated[candidate.path] = true
+		note := "Apple Music media folder. Quit Music before moving. For future imports, check Music > Settings > Files > Media Location; keep the external disk connected while using this library."
+		if candidate.legacy {
+			note = "Legacy iTunes media folder. iTunes is not the current Mac music app; move this only if these existing files are still part of a library you use. Check Music > Settings > Files > Media Location and keep the external disk connected while using the library."
 		}
+		addAppleManagedCandidate(candidate.path, candidate.name, CategoryAppleMedia, "Music",
+			note, associated, items, bySource)
 	}
 
 	// Finder and Apple Devices keep iPhone and iPad backups in MobileSync.
@@ -124,35 +135,93 @@ func scanAppleMediaData(home string, associated map[string]bool, items map[strin
 		"Finder/Apple Devices backup folder. Wait for any device backup or sync to finish before moving. If access is denied, give your terminal Full Disk Access and scan again.",
 		associated, items, bySource)
 
-	// The TV app's media folder and downloaded-title cache are separate locations.
-	// Never scan the entire TV app container as a movable library.
+	// The TV app exposes its Media folder location in Settings > Files. Use that
+	// configured path rather than moving the enclosing Movies/TV library folder.
+	// Download cache locations are app-managed and undocumented, so only surface
+	// one if a known directory is actually present.
+	tvMediaPath := appleTVMediaFolder(home)
 	tvCandidates := []struct {
-		path string
-		name string
-		note string
+		path       string
+		name       string
+		note       string
+		ifExisting bool
 	}{
-		{filepath.Join(home, "Movies", "TV"), "Apple TV Media", "Apple TV media folder. Quit TV before moving. Review TV > Settings > Files > Media folder location afterwards; downloaded titles may be DRM protected and need the disk connected for playback."},
-		{filepath.Join(home, "Library", "Containers", "com.apple.TV", "Data", "Library", "Caches", "com.apple.TV", "Downloads"), "Apple TV Downloads", "Apple TV downloaded titles. Quit TV before moving. Downloads may be DRM protected; verify playback with the external disk connected."},
-		{filepath.Join(home, "Library", "Containers", "com.apple.TV", "Data", "Library", "Downloads"), "Apple TV Downloads", "Apple TV downloaded titles. Quit TV before moving. Downloads may be DRM protected; verify playback with the external disk connected."},
+		{tvMediaPath, "Apple TV Media", "Apple TV media folder from TV > Settings > Files. Quit TV before moving. After moving, verify the Media folder location in TV settings; downloaded titles may be DRM protected and need the disk connected for playback.", false},
+		{filepath.Join(home, "Library", "Containers", "com.apple.TV", "Data", "Library", "Caches", "com.apple.TV", "Downloads"), "Apple TV Downloads", "Apple TV app-managed download cache. Quit TV before moving. Downloads may be DRM protected; verify playback with the external disk connected.", true},
+		{filepath.Join(home, "Library", "Containers", "com.apple.TV", "Data", "Library", "Downloads"), "Apple TV Downloads", "Apple TV app-managed download folder. Quit TV before moving. Downloads may be DRM protected; verify playback with the external disk connected.", true},
 	}
 	for _, candidate := range tvCandidates {
+		if candidate.ifExisting {
+			if _, err := os.Lstat(candidate.path); os.IsNotExist(err) {
+				continue
+			}
+		}
 		addAppleManagedCandidate(candidate.path, candidate.name, CategoryAppleMedia, "TV", candidate.note, associated, items, bySource)
 	}
 }
 
+func appleMusicMediaFolder(home string) string {
+	fallback := filepath.Join(home, "Music", "Music", "Media.localized")
+	output, err := exec.Command("defaults", "read", "com.apple.Music", "media-folder-url").Output()
+	if err != nil {
+		return fallback
+	}
+	mediaURL, err := url.Parse(strings.TrimSpace(string(output)))
+	if err != nil || mediaURL.Scheme != "file" || (mediaURL.Host != "" && mediaURL.Host != "localhost") || mediaURL.Path == "" {
+		return fallback
+	}
+	return filepath.Clean(filepath.FromSlash(mediaURL.Path))
+}
+
+func appleTVMediaFolder(home string) string {
+	fallback := filepath.Join(home, "Movies", "TV", "Media.localized")
+	output, err := exec.Command("defaults", "read", "com.apple.TV", "media-folder-url").Output()
+	if err != nil {
+		return fallback
+	}
+	mediaURL, err := url.Parse(strings.TrimSpace(string(output)))
+	if err != nil || mediaURL.Scheme != "file" || (mediaURL.Host != "" && mediaURL.Host != "localhost") || mediaURL.Path == "" {
+		return fallback
+	}
+	return filepath.Clean(filepath.FromSlash(mediaURL.Path))
+}
 func addAppleManagedCandidate(path, name string, category Category, owner, note string, associated map[string]bool, items map[string]Item, bySource map[string]Operation) {
 	if hasSymlinkParent(path) {
 		return
 	}
-	if item, ok := makeItemAtLeast(path, name, category, owner, bySource, candidateMinimumBytes); ok {
-		item.Reason = note
+	if item, ok := makeItemAtLeast(path, name, category, owner, bySource, 0); ok {
+		switch item.Status {
+		case StatusMoved:
+			item.Reason = "Already moved to external storage. Use Restore to bring it back."
+		case StatusDiskOffline:
+			item.Reason = "Already moved, but the destination disk is unavailable. Connect the disk to use or restore this data."
+		case StatusUnavailable:
+			if item.Reason != "" {
+				item.Reason += " " + note
+			} else {
+				item.Reason = note
+			}
+		default:
+			item.Reason = note
+		}
+		item.CreateWhenMissing = true
+		if info, err := os.Lstat(path); err == nil && info.Mode()&fs.ModeSymlink == 0 && !info.IsDir() {
+			item.Status = StatusUnavailable
+			item.Reason = "This Apple-managed location is not a directory. " + note
+		}
 		items[path] = item
 		associated[path] = true
 		return
 	}
 	_, statErr := os.Lstat(path)
-	_, _, sizeErr := allocatedSizeAtLeast(path, candidateMinimumBytes)
-	if (statErr != nil && os.IsPermission(statErr)) || (sizeErr != nil && os.IsPermission(sizeErr)) {
+	if os.IsNotExist(statErr) {
+		items[path] = Item{ID: shortID(path), Name: name, Category: category, Status: StatusAvailable,
+			SourcePath: path, Owner: owner, CreateWhenMissing: true,
+			Reason: note + " The folder does not exist yet; moving it creates a link now so future data can be stored on the selected external disk."}
+		associated[path] = true
+		return
+	}
+	if os.IsPermission(statErr) {
 		items[path] = Item{ID: shortID(path), Name: name, Category: category, Status: StatusUnavailable,
 			SourcePath: path, Reason: "macOS denied access to this location. " + note}
 		associated[path] = true
@@ -475,6 +544,9 @@ func makeItemAtLeast(path, name string, category Category, owner string, bySourc
 	if !knownSize {
 		if size, err := allocatedSize(measurePath); err == nil {
 			item.SizeBytes = size
+		} else {
+			item.Status = StatusUnavailable
+			item.Reason = "Could not measure candidate contents: " + err.Error()
 		}
 	}
 	return item, true
@@ -556,7 +628,7 @@ func readAppIdentity(appPath string) appIdentity {
 	if name == "" {
 		name = stringValue("CFBundleName")
 	}
-	return appIdentity{Name: name, BundleID: stringValue("CFBundleIdentifier")}
+	return appIdentity{Name: name, BundleID: stringValue("CFBundleIdentifier"), Executable: stringValue("CFBundleExecutable"), Path: appPath}
 }
 
 func ownerForDataName(name string, apps []appIdentity) *appIdentity {
@@ -650,6 +722,11 @@ func shortID(path string) string {
 
 func sortItems(items []Item) {
 	sort.Slice(items, func(i, j int) bool {
+		firstIsFutureApplePath := items[i].CreateWhenMissing && items[i].SizeBytes == 0
+		secondIsFutureApplePath := items[j].CreateWhenMissing && items[j].SizeBytes == 0
+		if firstIsFutureApplePath != secondIsFutureApplePath {
+			return firstIsFutureApplePath
+		}
 		if items[i].Status != items[j].Status {
 			return items[i].Status < items[j].Status
 		}

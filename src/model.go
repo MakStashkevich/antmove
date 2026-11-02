@@ -36,6 +36,7 @@ type Item struct {
 	Reason            string     `json:"reason,omitempty"`
 	Owner             string     `json:"owner,omitempty"`
 	SourceFingerprint string     `json:"-"`
+	CreateWhenMissing bool       `json:"-"`
 }
 
 type VolumeRating string

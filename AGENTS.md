@@ -43,7 +43,7 @@ Keep a behavior change in its owning file. Avoid expanding the CLI surface when 
 1. Scanning, status, disk listing, and dry-run are read-only. Prefer them before any operation that changes files.
 2. A real move or restore requires the user's explicit request. Show or run a dry-run first, explain the paths, disk, size, and material warning, then wait for approval.
 3. A caution-rated disk requires two separate confirmations. Never suggest that double confirmation makes an unsuitable disk recommended.
-4. Never automatically close an app, Docker/container engine, backup, or sync process. Detect related activity and stop the operation with a clear instruction.
+4. Never close an app unless the user separately confirms that Antmove may send it a graceful quit request. Let macOS request Automation permission; if denied, stop without moving files. Never force-quit, discard unsaved work, or terminate Docker/container engines, backup, sync, or other background services.
 5. Copy with macOS ditto to a staging path, verify content, then create the original-path symlink. Keep journal phases and recovery behavior consistent with the transfer state machine.
 6. Do not remove the original data before verification. On failure, restore the source path or leave a clear recovery-required journal entry.
 7. Preserve spaces, Unicode, and symlink semantics in paths. Quote every path passed to an external command.

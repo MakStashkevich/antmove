@@ -33,16 +33,19 @@ Do not infer ownership from a folder name alone. Items marked unassigned need th
 5. Wait for an explicit approval of that plan before running a real move.
 6. For a caution-rated disk, antmove requires two separate confirmations. Do not bypass or emulate these confirmations.
 
-Never close an app or engine automatically. If Antmove reports related activity, ask the user to close the app or finish the backup/sync, then rescan.
+If a related GUI app is active, Antmove may offer a separate confirmation to send it a graceful quit request before the move. Explain that the app may be writing files and that quitting prevents changes during copying and verification. Never force-quit or discard unsaved work. macOS may ask the terminal app for Automation permission; if denied, stop without moving files. Never terminate engines, backup/sync processes, or other background services; ask the user to finish those tasks and rescan.
 
-A real non-interactive transfer to a recommended disk uses <code>am move --disk PATH --yes ID</code>. Only run it after approval. Do not combine a caution disk with an automatic confirmation.
+A real non-interactive transfer to a recommended disk uses <code>am move --disk PATH --yes ID</code>. To separately authorize graceful app quitting when needed, add <code>--close-apps</code>; macOS Automation permission is still required. A caution disk also needs <code>--confirm-caution</code> twice. Only run commands after approval.
 
 ## Apple data
 
 - Photos: ask the user to quit Photos; libraries should use APFS or Mac OS Extended. After moving, the user may need to open the library from the new location and set it as the System Photo Library.
 - Music: quit Music first. Antmove does not edit Music preferences; the user should review its Media Location setting.
 - Apple TV: quit TV and verify downloaded titles play from the external disk. Downloads can be DRM protected.
+- Apple TV media: scan the Media folder URL configured in `TV > Settings > Files`; the default is `~/Movies/TV/Media.localized`. Do not move the enclosing `~/Movies/TV` folder. Apple does not document a stable download-cache path, so show a known cache only if it exists.
 - iPhone/iPad backups: wait for backup and sync to finish. If access is denied, explain that the terminal app may need Full Disk Access; do not attempt to grant it automatically.
+- Antmove lists supported standard Apple media and backup locations even if they are empty or missing. A confirmed move creates the folder if needed and leaves a link for future writes. Explain that a `0 B` move relocates the path, not existing content. For a new Photos library, use the Photos Option-open > Create New workflow; the app may need to initialize the library itself.
+- Apple Music is the current Mac music app. Treat iTunes media paths as legacy data and list them only when the corresponding folders exist; never recommend iTunes for current macOS.
 - For any external library, remind the user that the disk must be mounted when the data is used.
 
 ## Restore and recovery
