@@ -1,9 +1,9 @@
 class Antmove < Formula
   desc "Move Mac apps and data to external drives while keeping their paths working"
   homepage "https://github.com/MakStashkevich/antmove"
-  url "https://github.com/MakStashkevich/antmove/archive/refs/tags/v0.1.3.tar.gz"
-  version "0.1.3"
-  sha256 "ed820979eaec47dae36e0fd383b98b731d82c6a0da6afbab698fa24002818b5e"
+  url "https://github.com/MakStashkevich/antmove/archive/refs/tags/v0.1.4.tar.gz"
+  version "0.1.4"
+  sha256 "1b7344f3c063075c0fdc4924b477c57b2f63720ea8d6ff0f427fcb93379a283f"
   license "MIT"
 
   depends_on macos: :sequoia
