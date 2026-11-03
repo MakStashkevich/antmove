@@ -61,6 +61,7 @@ Keep a behavior change in its owning file. Avoid expanding the CLI surface when 
 - Interactive moves should report copied bytes, percentage, remaining bytes, and an approximate ETA while copying.
 - Build both release architectures with <code>make release</code> or <code>./build.sh</code>.
 - Keep the Homebrew formula version, source URL, and SHA-256 aligned with the release source commit.
+- Pushing a matching <code>v*</code> tag publishes the release and automatically updates the Homebrew formula on <code>main</code> after the assets are published.
 - Do not claim a release is published unless a GitHub release exists and its assets are verified.
 - When a command, option, candidate type, or safety rule changes, update all seven README files, <code>llms.txt</code>, and the agent skill where applicable.
 

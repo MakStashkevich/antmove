@@ -53,3 +53,53 @@ jobs:
           --title "antmove $RELEASE_TAG"
           --generate-notes
           --verify-tag
+
+  update-homebrew-formula:
+    name: Update Homebrew formula
+    runs-on: macos-15
+    needs: release
+    steps:
+      - name: Check out latest main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Update formula for the published tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${RELEASE_TAG#v}"
+          SOURCE_URL="https://github.com/MakStashkevich/antmove/archive/refs/tags/${RELEASE_TAG}.tar.gz"
+          SOURCE_SHA="$(curl -fsSL "$SOURCE_URL" | shasum -a 256 | awk '{print $1}')"
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "Could not calculate the Homebrew source archive SHA-256" >&2
+            exit 1
+          fi
+
+          export VERSION SOURCE_SHA
+          ruby -e '
+            path = "Formula/antmove.rb"
+            content = File.read(path)
+            replacements = {
+              /^  url "https:\/\/github\.com\/MakStashkevich\/antmove\/archive\/refs\/tags\/v[^"]+\.tar\.gz"$/ => "  url \"https://github.com/MakStashkevich/antmove/archive/refs/tags/v#{ENV.fetch("VERSION")}.tar.gz\"",
+              /^  version "[^"]+"$/ => "  version \"#{ENV.fetch("VERSION")}\"",
+              /^  sha256 "[0-9a-f]{64}"$/ => "  sha256 \"#{ENV.fetch("SOURCE_SHA")}\""
+            }
+            replacements.each do |pattern, replacement|
+              abort "Formula field not found: #{pattern}" unless content.sub!(pattern, replacement)
+            end
+            File.write(path, content)
+          '
+          ruby -c Formula/antmove.rb
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/antmove.rb
+          if git diff --cached --quiet; then
+            echo "Homebrew formula already matches ${RELEASE_TAG}"
+            exit 0
+          fi
+          git commit -m "build: update Homebrew formula for ${VERSION}"
+          git push origin HEAD:main
