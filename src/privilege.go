@@ -1,10 +1,15 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -74,4 +79,100 @@ func dittoCopy(source, destination string, privileged bool) ([]byte, error) {
 		command.Stdin = os.Stdin
 	}
 	return command.CombinedOutput()
+}
+
+func dittoCopyProgress(source, destination string, privileged bool, progress func(int64)) ([]byte, error) {
+	if progress == nil {
+		return dittoCopy(source, destination, privileged)
+	}
+	args := []string{"-V", "--rsrc", "--extattr", "--acl", source, destination}
+	command := exec.Command("/usr/bin/ditto", args...)
+	if privileged {
+		command = exec.Command("/usr/bin/sudo", append([]string{"/usr/bin/ditto"}, args...)...)
+		command.Stdin = os.Stdin
+	}
+	stderrPipe, err := command.StderrPipe()
+	if err != nil {
+		return nil, err
+	}
+	var stderr bytes.Buffer
+	var stdout bytes.Buffer
+	command.Stdout = &stdout
+	if err := command.Start(); err != nil {
+		return nil, err
+	}
+	paths := make(chan string)
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		defer close(paths)
+		scanner := bufio.NewScanner(stderrPipe)
+		scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
+		for scanner.Scan() {
+			line := scanner.Text()
+			_, _ = stderr.WriteString(line + "\n")
+			line = strings.TrimSpace(line)
+			if !strings.HasPrefix(line, "copying file ") || !strings.HasSuffix(line, " ...") {
+				continue
+			}
+			rel := strings.TrimSuffix(strings.TrimPrefix(line, "copying file "), " ...")
+			rel = strings.TrimPrefix(rel, "./")
+			paths <- rel
+		}
+	}()
+	ticker := time.NewTicker(300 * time.Millisecond)
+	defer ticker.Stop()
+	var completed, currentTotal, currentDone int64
+	current := ""
+	pollCurrent := func() {
+		if current == "" {
+			return
+		}
+		info, statErr := os.Stat(filepath.Join(destination, current))
+		if statErr == nil && info.Mode().IsRegular() {
+			size := allocatedFileBytes(info)
+			if size > currentTotal {
+				size = currentTotal
+			}
+			if size > currentDone {
+				currentDone = size
+				progress(completed + currentDone)
+			}
+		}
+	}
+	for paths != nil {
+		select {
+		case rel, ok := <-paths:
+			if !ok {
+				paths = nil
+				break
+			}
+			pollCurrent()
+			completed += currentTotal
+			current, currentTotal, currentDone = "", 0, 0
+			info, statErr := os.Lstat(filepath.Join(source, rel))
+			if statErr == nil && info.Mode().IsRegular() {
+				current, currentTotal = rel, allocatedFileBytes(info)
+				pollCurrent()
+			}
+		case <-ticker.C:
+			pollCurrent()
+		}
+	}
+	pollCurrent()
+	completed += currentTotal
+	progress(completed)
+	err = command.Wait()
+	<-finished
+	if err != nil {
+		return append(stdout.Bytes(), stderr.Bytes()...), err
+	}
+	return append(stdout.Bytes(), stderr.Bytes()...), nil
+}
+
+func allocatedFileBytes(info os.FileInfo) int64 {
+	if raw, ok := info.Sys().(*syscall.Stat_t); ok && raw.Blocks > 0 {
+		return raw.Blocks * 512
+	}
+	return info.Size()
 }

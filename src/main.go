@@ -337,6 +337,9 @@ func printStatus() error {
 		if op.Error != "" {
 			fmt.Printf("  Note: %s\n", op.Error)
 		}
+		if op.Warning != "" {
+			fmt.Printf("  Warning: %s\n", op.Warning)
+		}
 	}
 	return nil
 }

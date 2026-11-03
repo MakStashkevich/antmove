@@ -31,6 +31,8 @@ you can add compatible disks when you need more room and keep only the everyday 
 - Apple Photos libraries, Apple Music media, existing legacy iTunes folders, Apple TV media and downloads, and iPhone/iPad backups when macOS allows access;
 - old Extender transfer records, so they can be imported into antmove's state and journal.
 
+antmove also lists recognized AI assistant folders in common user data locations, including <code>.codex</code>, <code>.agents</code>, <code>.claude</code>, <code>.copilot</code>, <code>.gemini</code>, <code>.qwen</code>, <code>.antigravity</code>, <code>.kilocode</code>, <code>.hermes</code>, <code>.config/opencode</code>, and known app support folders. They may contain conversation history and project context; close the assistant and finish syncing or generation before moving one. Review its contents first. Non-portable Unix socket files are omitted only when no process has them open; an active socket blocks the move.
+
 Docker Desktop, OrbStack, Colima, and Rancher Desktop storage can appear with instructions from their makers. antmove doesn't move those engine stores directly. They contain virtual machines and databases, and dragging a folder around can break the engine.
 
 If antmove can't confidently tell which app owns a large folder, it leaves it unassigned. better not to guess.
@@ -169,7 +171,7 @@ this is the order i'd use:
 4. choose **Move data** in the menu, mark the items, choose a disk, read the warning, and confirm;
 5. leave the disk connected while using the moved data.
 
-if a related app is open, the interactive flow asks separately before antmove sends a graceful quit request. the CLI equivalent is <code>--close-apps</code>. macOS may ask the terminal for Automation permission. antmove won't force-quit apps or stop container engines and background services.
+if a related app is open, the interactive flow asks separately before antmove sends a graceful quit request. the CLI equivalent is <code>--close-apps</code>. macOS may ask the terminal for Automation permission. For AI assistant data only, after the separate confirmation and once the main app has exited gracefully, Antmove force-quits verified helper processes left inside that app bundle. It does not force-quit the main app or stop container engines, backups, sync, or other services.
 
 you can preview a transfer using the ID from <code>am scan</code>:
 
@@ -193,13 +195,15 @@ don't confirm automatically. read why the disk got that rating first. a slow dis
 
 antmove checks free space, copies with macOS <code>ditto</code> into a temporary folder, compares hashes and directory contents, and only then leaves a link to the new location. the operation journal lives in <code>~/Library/Application Support/antmove</code>.
 
+During an interactive move, the screen shows the copied amount, percentage, remaining size, and an approximate time left. If cleanup cannot safely remove the original backup, antmove keeps it and reports the issue. Recovery ignores and removes Finder metadata files named <code>.DS_Store</code> and <code>._*</code>, then verifies remaining backup data against the destination; changed data is preserved.
+
 ## a few notes about photos, music, movies, and backups
 
 - **Photos.** quit Photos before moving a <code>.photoslibrary</code>. Apple recommends APFS or Mac OS Extended. Open the library from its new location; if you use iCloud Photos, select it as the System Photo Library if needed. Keep the disk connected.
 - **Music.** quit Music. After the move, check <code>Music → Settings → Files → Media Location</code>, especially if you'll add new files. antmove doesn't change Music settings.
 - **Apple TV.** quit TV too. Antmove reads the Media folder path configured in <code>TV → Settings → Files</code> (the default is <code>~/Movies/TV/Media.localized</code>) instead of moving its enclosing library folder. Apple does not document a stable filesystem path for protected downloads, so Antmove only lists a known download-cache path if it exists. Downloaded movies may be DRM-protected. Check playback after the move and keep the disk connected while watching.
 - **iPhone/iPad backups.** the standard location is <code>~/Library/Application Support/MobileSync/Backup</code>. Wait for Finder to finish backup or sync. If macOS denies access, give Full Disk Access to the terminal app running <code>am</code>, reopen it, and run <code>am scan</code> again.
-- **Closing active apps.** in the interactive move flow, Antmove asks separately before sending an active related app a graceful quit request. For the CLI, add <code>--close-apps</code> (for example, <code>am move --disk /Volumes/WorkSSD --yes --close-apps ID</code>). macOS may ask the terminal app for Automation permission in System Settings → Privacy &amp; Security → Automation. Antmove never force-quits or discards unsaved work, and never stops backup, sync, or container services.
+- **Closing active apps.** in the interactive move flow, Antmove asks separately before sending an active related app a graceful quit request. For the CLI, add <code>--close-apps</code> (for example, <code>am move --disk /Volumes/WorkSSD --yes --close-apps ID</code>). macOS may ask the terminal app for Automation permission in System Settings → Privacy &amp; Security → Automation. For AI assistant data only, after the separate confirmation and once the main app has exited gracefully, Antmove force-quits verified helper processes left inside that app bundle. It never force-quits the main app, discards unsaved work, or stops backup, sync, or container services.
 - **Empty or not-yet-created folders.** <code>am scan</code> also lists standard Apple Music, Photos, Apple TV, and iPhone/iPad backup locations when they are empty or missing. A <code>0 B</code> item can be moved too: after confirmation, antmove creates the source folder if needed and links it to the external disk. Future writes through that path can then land on the external disk. Quit the related app and finish any backup or sync first. For Music, check that Media Location points to the linked folder. Photos libraries are managed packages; create a new one with Photos’ Option-open → Create New flow. If Photos cannot initialize the linked placeholder, create the library directly on the external disk and select it in Photos. Legacy iTunes paths appear only if those folders already exist.
 - **Docker.** use the engine's supported settings. i wouldn't drag VM or database files around like ordinary folders.
 

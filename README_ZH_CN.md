@@ -31,6 +31,8 @@ macOS 和应用继续用之前的路径，实际文件存放在已连接的外�
 - macOS 允许访问时的 Photos 照片图库、Apple Music 媒体、现存的旧 iTunes 文件夹、Apple TV 媒体/下载目录和 iPhone/iPad 备份；
 - 旧 Extender 的迁移记录。
 
+antmove 也会列出常见用户数据位置中的 AI 助手文件夹，例如 <code>.codex</code>、<code>.agents</code>、<code>.claude</code>、<code>.copilot</code>、<code>.gemini</code>、<code>.qwen</code>、<code>.antigravity</code>、<code>.kilocode</code>、<code>.hermes</code>、<code>.config/opencode</code> 和已知应用支持目录。里面可能保存对话历史和项目上下文；移动前请关闭助手并等待同步或生成任务完成，先检查文件夹内容。不可迁移的 Unix 套接字仅在没有进程使用时才会从副本中排除；活动套接字会阻止迁移。
+
 Docker Desktop、OrbStack、Colima 和 Rancher Desktop 的数据也可能出现，并附有厂商建议。但 antmove 不会直接移动这些引擎的内部存储。里面有虚拟机和数据库，普通地挪文件夹可能把引擎弄坏。
 
 如果它不能确定一个大文件夹属于哪个应用，就不会替你猜。会单独列出来让你自己看。
@@ -165,7 +167,7 @@ am disks --test "/Volumes/Work SSD"
 4. 在菜单里选 **Move data**，标记项目、选磁盘、读完警告再确认；
 5. 用这些数据时，别把外置盘拔掉。
 
-如果相关应用仍在运行，交互菜单会单独询问是否向它发送正常退出请求；CLI 可用 <code>--close-apps</code>。macOS 可能会要求终端获得自动化权限。Antmove 不会强制退出应用，也不会停止容器引擎或后台服务。
+如果相关应用仍在运行，交互菜单会单独询问是否向它发送正常退出请求；CLI 可用 <code>--close-apps</code>。macOS 可能会要求终端获得自动化权限。迁移 AI 助手数据时，经过单独确认且主应用正常退出后，Antmove 会强制结束同一应用包内经核验的残留辅助进程；不会停止容器引擎或其他后台服务。
 
 先用 <code>am scan</code> 输出的 ID 看计划：
 
@@ -189,13 +191,15 @@ am move --disk "/Volumes/Shared" --confirm-caution --confirm-caution 71a29f5a1cd
 
 antmove 会检查剩余空间，用 macOS 的 <code>ditto</code> 复制到临时目录，核对哈希和目录内容，最后才在原路径放符号链接。操作日志在 <code>~/Library/Application Support/antmove</code>。
 
+传输过程中，界面会显示已复制容量、百分比、剩余容量和预计剩余时间。清理备份时，antmove 会删除 Finder 元数据文件 <code>.DS_Store</code> 和 <code>._*</code>，再核对其余数据与目标副本；有变化的数据会保留并提示错误。
+
 ## 照片、音乐、电影和备份
 
 - **Photos：**移动 <code>.photoslibrary</code> 前先退出 Photos。Apple 推荐 APFS 或 Mac OS Extended。移动后从新位置打开图库；如果使用 iCloud Photos，必要时把它设成系统照片图库。
 - **Music：**退出 Music。移动后看看 **Music → Settings → Files → Media Location**，特别是之后还会导入文件的话。antmove 不改 Music 设置。
 - **Apple TV：**先退出 TV。下载的电影可能有 DRM。移动后试播一下，观看时保持磁盘连接。
 - **Apple TV 路径：**使用 <code>TV → Settings → Files</code> 中设置的 Media folder，默认是 <code>~/Movies/TV/Media.localized</code>。不会移动整个上级文件夹。Apple 没有公布稳定的下载缓存路径，因此只在已存在时显示已知缓存目录。
-- **关闭正在运行的应用：**若相关应用仍在运行，Antmove 会单独询问是否发送正常退出请求。CLI 使用 <code>--close-apps</code>。macOS 可能要求终端在“系统设置 → 隐私与安全性 → 自动化”获得控制权限。Antmove 不会强制退出应用、丢弃未保存内容，也不会停止备份、同步或容器服务。
+- **关闭正在运行的应用：**若相关应用仍在运行，Antmove 会单独询问是否发送正常退出请求。CLI 使用 <code>--close-apps</code>。macOS 可能要求终端在“系统设置 → 隐私与安全性 → 自动化”获得控制权限。仅在迁移 AI 助手数据时，经过单独确认且主应用正常退出后，Antmove 会强制结束该应用包内经核验仍残留的辅助进程。它不会强制退出主应用、丢弃未保存内容，也不会停止备份、同步或容器服务。
 - **iPhone/iPad 备份：**默认位置是 <code>~/Library/Application Support/MobileSync/Backup</code>。等 Finder 备份/同步结束再搬。如果 macOS 拒绝访问，给运行 <code>am</code> 的终端应用 Full Disk Access，重新打开后再扫描。
 - **空文件夹或尚未创建的目录：**<code>am scan</code> 也会列出 Music、Photos、Apple TV 和 iPhone/iPad 备份的标准位置，即使它们为空或还不存在。<code>0 B</code> 的项目也能迁移：确认后 antmove 会按需创建原目录，并把它链接到外置磁盘。之后通过这个路径写入的数据就可以直接存到外置盘。操作前先退出相关应用，并等备份或同步结束。Music 要确认 Media Location 指向这个链接目录。Photos 图库是应用管理的专用包；新建图库请按住 Option 打开 Photos，选择 Create New。如果 Photos 无法在空链接位置初始化图库，就直接在外置盘创建，再从 Photos 中选择它。旧 iTunes 路径只会在相应文件夹确实存在时显示。
 - **Docker：**走引擎自己的迁移方式。虚拟机或数据库文件别当普通文件夹拖来拖去，我不会这么做。

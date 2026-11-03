@@ -31,6 +31,8 @@ on peut ajouter des disques compatibles au fur et à mesure. « stockage infini 
 - les photothèques Photos, les médias Apple Music, les anciens dossiers iTunes s’ils existent, les dossiers média/téléchargements Apple TV et les sauvegardes iPhone/iPad si macOS autorise l’accès ;
 - les anciennes opérations Extender.
 
+antmove affiche aussi les dossiers d’assistants IA reconnus dans les emplacements courants des données utilisateur, notamment <code>.codex</code>, <code>.agents</code>, <code>.claude</code>, <code>.copilot</code>, <code>.gemini</code>, <code>.qwen</code>, <code>.antigravity</code>, <code>.kilocode</code>, <code>.hermes</code>, <code>.config/opencode</code> et les dossiers connus des applications. Ils peuvent contenir des historiques de conversation et du contexte de projet. Avant le déplacement, fermez l’assistant, attendez la fin de la synchronisation ou de la génération et vérifiez le contenu du dossier. Les sockets Unix non portables ne sont omises que si aucun processus ne les utilise ; une socket active bloque le déplacement.
+
 Docker Desktop, OrbStack, Colima et Rancher Desktop peuvent apparaître avec les conseils de leur éditeur. par contre antmove ne déplace pas directement leurs stockages internes. il y a des machines virtuelles et des bases de données là-dedans ; déplacer un dossier à la main peut casser le moteur.
 
 si l’app propriétaire d’un grand dossier n’est pas claire, antmove ne fait pas semblant de savoir. il le laisse à part pour que tu regardes.
@@ -165,7 +167,7 @@ voilà l’ordre que je suivrais :
 4. choisir **Move data**, marquer les éléments, sélectionner un disque, lire l’avertissement et confirmer ;
 5. garder le disque connecté pendant l’utilisation des données déplacées.
 
-si une app liée est ouverte, le menu demande séparément avant d’envoyer une demande de fermeture normale ; le CLI propose <code>--close-apps</code>. macOS peut demander au terminal l’autorisation Automation. antmove ne force pas la fermeture et n’arrête pas les moteurs de conteneurs ni les services en arrière-plan.
+si une app liée est ouverte, le menu demande séparément avant d’envoyer une demande de fermeture normale ; le CLI propose <code>--close-apps</code>. macOS peut demander au terminal l’autorisation Automation. pour les données d’assistants IA, après confirmation séparée et fermeture normale de l’app principale, antmove termine de force les auxiliaires vérifiés restés dans son bundle. les moteurs de conteneurs et les autres services restent intacts.
 
 tu peux prévisualiser avec l’ID de <code>am scan</code> :
 
@@ -189,13 +191,15 @@ ne confirme pas machinalement. lis pourquoi le disque est déconseillé. s’il 
 
 antmove vérifie l’espace libre, copie avec <code>ditto</code> dans un dossier temporaire, compare les empreintes et le contenu, puis crée le lien à l’ancien emplacement. le journal se trouve dans <code>~/Library/Application Support/antmove</code>.
 
+Pendant le transfert, l’interface affiche le volume copié, le pourcentage, le volume restant et une estimation du temps. Lors du nettoyage, antmove supprime les métadonnées Finder <code>.DS_Store</code> et <code>._*</code>, puis compare le reste à la destination. Toute donnée modifiée est conservée et signalée.
+
 ## pour Photos, Music, les films et les sauvegardes
 
 - **Photos :** quitte Photos avant de déplacer une photothèque <code>.photoslibrary</code>. Apple recommande APFS ou Mac OS étendu. Ouvre ensuite la photothèque depuis son nouvel emplacement ; avec Photos iCloud, choisis-la comme photothèque système si nécessaire.
 - **Music :** quitte Music. Après le transfert, regarde **Music → Settings → Files → Media Location**, surtout si tu comptes importer de nouveaux fichiers. antmove ne change pas les réglages de Music.
 - **Apple TV :** quitte TV aussi. Les films téléchargés peuvent être protégés par DRM. vérifie qu’ils se lancent après le déplacement et garde le disque connecté.
 - **Chemin Apple TV :** Antmove lit le dossier Media défini dans <code>TV → Settings → Files</code> (par défaut <code>~/Movies/TV/Media.localized</code>) sans déplacer le dossier parent. Apple ne documente pas de chemin stable pour les téléchargements protégés ; un cache connu n’apparaît que s’il existe.
-- **Fermeture des apps actives :** si une app liée est ouverte, Antmove demande séparément avant de lui envoyer une demande de fermeture normale. Pour le CLI, ajoute <code>--close-apps</code>. macOS peut demander au terminal l’autorisation Automation. Antmove ne force jamais la fermeture, ne supprime pas le travail non enregistré et n’arrête pas les sauvegardes, synchronisations ou services de conteneurs.
+- **Fermeture des apps actives :** si une app liée est ouverte, Antmove demande séparément avant de lui envoyer une demande de fermeture normale. Pour le CLI, ajoute <code>--close-apps</code>. macOS peut demander au terminal l’autorisation Automation. Pour les données d’assistants IA uniquement, après confirmation séparée et fermeture normale de l’app principale, Antmove termine de force les processus auxiliaires vérifiés encore présents dans son bundle. Il ne force pas la fermeture de l’app principale et n’interrompt ni sauvegardes, ni synchronisations, ni services de conteneurs.
 - **Sauvegardes iPhone/iPad :** l’emplacement standard est <code>~/Library/Application Support/MobileSync/Backup</code>. attends la fin des sauvegardes et synchronisations Finder. si macOS bloque l’accès, donne l’accès complet au disque à l’app Terminal qui lance <code>am</code>, rouvre-la et rescane.
 - **Dossiers vides ou pas encore créés :** <code>am scan</code> affiche aussi les emplacements standard de Music, Photos, Apple TV et des sauvegardes iPhone/iPad, même s’ils sont vides ou absents. un élément de <code>0 B</code> peut être déplacé : après confirmation, antmove crée le dossier d’origine si nécessaire et le relie au disque externe. les prochaines écritures faites à cet emplacement peuvent alors aller sur le disque externe. quitte l’app concernée et attends la fin des sauvegardes ou synchronisations. pour Music, vérifie que Media Location pointe vers le dossier lié. une photothèque Photos est un paquet géré par l’app : crée-en une nouvelle avec Photos ouvert en maintenant Option, puis Create New. si Photos ne peut pas initialiser le lien vide, crée la photothèque directement sur le disque externe et sélectionne-la dans Photos. les anciens chemins iTunes ne s’affichent que si les dossiers existent déjà.
 - **Docker :** utilise la méthode de migration prévue par le moteur. déplacer à la main les fichiers d’une VM ou d’une base de données, je ne le ferais pas.

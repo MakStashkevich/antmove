@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -73,6 +74,312 @@ func TestRequiredCapacity(t *testing.T) {
 	}
 	if got := requiredCapacity(int64(^uint64(0) >> 1)); got != int64(^uint64(0)>>1) {
 		t.Fatalf("overflow must saturate at MaxInt64, got %d", got)
+	}
+}
+
+func TestAIAssistantProcessRecognition(t *testing.T) {
+	cases := []struct {
+		name     string
+		item     Item
+		binary   string
+		app      appIdentity
+		wantQuit bool
+		want     bool
+	}{
+		{name: "Codex CLI inside ChatGPT app", item: Item{Category: CategoryAIData, SourcePath: "/Users/test/.codex"}, binary: "codex", app: appIdentity{Name: "ChatGPT", BundleID: "com.openai.codex"}, wantQuit: true, want: true},
+		{name: "Cursor app helper", item: Item{Category: CategoryAIData, SourcePath: "/Users/test/.cursor"}, binary: "Cursor Helper", app: appIdentity{Name: "Cursor", BundleID: "com.cursor.Cursor"}, wantQuit: true, want: true},
+		{name: "Claude app helper", item: Item{Category: CategoryAIData, SourcePath: "/Users/test/.claude"}, binary: "Claude Helper", app: appIdentity{Name: "Claude", BundleID: "com.anthropic.claudefordesktop"}, wantQuit: true, want: true},
+		{name: "Antigravity shares Gemini state", item: Item{Category: CategoryAIData, SourcePath: "/Users/test/.gemini"}, binary: "Antigravity Helper", app: appIdentity{Name: "Antigravity", BundleID: "com.google.antigravity"}, wantQuit: true, want: true},
+		{name: "OpenCode app helper", item: Item{Category: CategoryAIData, SourcePath: "/Users/test/.config/opencode"}, binary: "OpenCode Helper", app: appIdentity{Name: "OpenCode", BundleID: "ai.opencode.desktop"}, wantQuit: true, want: true},
+		{name: "Qwen CLI without app bundle needs manual close", item: Item{Category: CategoryAIData, SourcePath: "/Users/test/.qwen"}, binary: "qwen", want: true},
+		{name: "Claude CLI in Terminal must not quit Terminal", item: Item{Category: CategoryAIData, SourcePath: "/Users/test/.claude"}, binary: "claude", app: appIdentity{Name: "Terminal", BundleID: "com.apple.Terminal"}, want: true},
+		{name: "macOS cursor service is unrelated", item: Item{Category: CategoryAIData, SourcePath: "/Users/test/.cursor"}, binary: "CursorUIViewService", want: false},
+		{name: "unrelated GUI app", item: Item{Category: CategoryAIData, SourcePath: "/Users/test/.qwen"}, binary: "Zed", app: appIdentity{Name: "Zed", BundleID: "dev.zed.Zed"}, want: false},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			activity, got := aiAssistantActivityForProcess(test.item, test.binary, test.app)
+			if got != test.want {
+				t.Fatalf("recognized = %t, want %t", got, test.want)
+			}
+			if got && activity.CanQuit != test.wantQuit {
+				t.Errorf("CanQuit = %t, want %t", activity.CanQuit, test.wantQuit)
+			}
+		})
+	}
+}
+
+func TestProcessTableAndParentAppDiscovery(t *testing.T) {
+	processes := parseProcessTable("98165 98164 /Users/test/.hermes/node/bin/node --runtime\n98164 97890 /Users/test/.local/bin/node /Library/Application Support/Zed/language-server.js\n97890 1 /Applications/Zed.app/Contents/MacOS/zed\n")
+	if len(processes) != 3 {
+		t.Fatalf("parsed %d process rows, want 3", len(processes))
+	}
+	byPID := make(map[int]processInfo, len(processes))
+	for _, process := range processes {
+		byPID[process.pid] = process
+	}
+	got := enclosingAppBundleForProcess(processes[0], byPID)
+	if got != "/Applications/Zed.app" {
+		t.Fatalf("enclosing app = %q, want /Applications/Zed.app", got)
+	}
+}
+
+func TestAIHelperTerminationScope(t *testing.T) {
+	host := "/Applications/ChatGPT.app"
+	main := filepath.Join(host, "Contents", "MacOS")
+	cases := []struct {
+		path string
+		want bool
+	}{
+		{filepath.Join(host, "Contents", "Frameworks", "Codex (Service).app", "Contents", "MacOS", "Codex (Service)"), true},
+		{filepath.Join(host, "Contents", "MacOS", "ChatGPT"), false},
+		{"/Applications/Zed.app/Contents/MacOS/zed", false},
+	}
+	for _, test := range cases {
+		if got := isAIHostHelperExecutable(test.path, host, main); got != test.want {
+			t.Errorf("isAIHostHelperExecutable(%q) = %t, want %t", test.path, got, test.want)
+		}
+	}
+}
+
+func TestCopyTreeSkipsOnlyInactiveUnixSockets(t *testing.T) {
+	root, err := os.MkdirTemp("/tmp", "am-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(root)
+	source := filepath.Join(root, "hermes-state")
+	destination := filepath.Join(root, "copied-state")
+	if err := os.Mkdir(source, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "history.jsonl"), []byte("conversation history\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	socketPath := filepath.Join(source, "gateway.sock")
+	listener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener.(*net.UnixListener).SetUnlinkOnClose(false)
+	if err := listener.Close(); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	output, skipped, err := copyTreeIgnoringInactiveSockets(source, destination)
+	if err != nil {
+		t.Fatalf("copy with stale socket failed: %v: %s", err, output)
+	}
+	if skipped != 1 {
+		t.Fatalf("skipped sockets = %d, want 1", skipped)
+	}
+	if _, err := os.Lstat(socketPath); err != nil {
+		t.Fatalf("source socket was not restored: %v", err)
+	}
+	after, err := os.Stat(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !after.ModTime().Equal(before.ModTime()) {
+		t.Fatalf("source directory modification time changed: before %s, after %s", before.ModTime(), after.ModTime())
+	}
+	if _, err := os.Lstat(filepath.Join(destination, "gateway.sock")); !os.IsNotExist(err) {
+		t.Fatalf("stale socket should be absent from destination, stat error = %v", err)
+	}
+	if err := verifyTree(filepath.Join(source, "history.jsonl"), filepath.Join(destination, "history.jsonl")); err != nil {
+		t.Fatalf("copied regular file does not verify: %v", err)
+	}
+}
+
+func TestCopyTreeRefusesActiveUnixSocket(t *testing.T) {
+	root, err := os.MkdirTemp("/tmp", "am-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(root)
+	source := filepath.Join(root, "assistant-state")
+	if err := os.Mkdir(source, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	socketPath := filepath.Join(source, "gateway.sock")
+	listener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	_, _, err = copyTreeIgnoringInactiveSockets(source, filepath.Join(root, "copy"))
+	if err == nil || !strings.Contains(err.Error(), "still open by process PID") {
+		t.Fatalf("active socket error = %v, want an owner PID diagnostic", err)
+	}
+	if _, err := os.Lstat(socketPath); err != nil {
+		t.Fatalf("active source socket was changed: %v", err)
+	}
+}
+
+func TestVerifyBackupContentsDetectsNewData(t *testing.T) {
+	root := t.TempDir()
+	backup, destination := filepath.Join(root, ".antmove-backup-test"), filepath.Join(root, "destination")
+	for _, path := range []string{backup, destination} {
+		if err := os.Mkdir(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(backup, "late-session.jsonl"), []byte("new conversation"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	op := Operation{Name: "test backup", SourcePath: filepath.Join(root, "source"), Category: CategoryAppData}
+	if err := removeVerifiedBackup(op, backup, destination, false); err == nil || !strings.Contains(err.Error(), "backup differs") {
+		t.Fatalf("backup cleanup error = %v, want preserved mismatch", err)
+	}
+	if _, err := os.Stat(filepath.Join(backup, "late-session.jsonl")); err != nil {
+		t.Fatalf("changed backup was removed: %v", err)
+	}
+}
+
+func TestVerifyBackupContentsAllowsMatchingPartialCleanup(t *testing.T) {
+	root := t.TempDir()
+	backup, destination := filepath.Join(root, "backup"), filepath.Join(root, "destination")
+	for _, path := range []string{backup, destination} {
+		if err := os.Mkdir(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(backup, ".DS_Store"), []byte("same metadata"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(destination, ".DS_Store"), []byte("rewritten Finder metadata"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(backup, "._archive"), []byte("old AppleDouble sidecar"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(destination, "._archive"), []byte("new AppleDouble sidecar"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(destination, "moved-data.jsonl"), []byte("already verified data"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyBackupContents(backup, destination, false); err != nil {
+		t.Fatalf("matching partial backup should be safe to clean: %v", err)
+	}
+}
+
+func TestCleanFinderMetadataEntriesLeavesOtherData(t *testing.T) {
+	root := t.TempDir()
+	backup := filepath.Join(root, "backup")
+	metadataDir := filepath.Join(backup, "empty-after-cleanup")
+	if err := os.MkdirAll(metadataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for path, content := range map[string]string{
+		filepath.Join(backup, ".DS_Store"):            "finder",
+		filepath.Join(metadataDir, "._session.jsonl"): "appledouble",
+		filepath.Join(backup, "keep-session.jsonl"):   "conversation data",
+	} {
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	empty, err := cleanFinderMetadataEntries(backup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if empty {
+		t.Fatal("backup with user data was reported empty")
+	}
+	if _, err := os.Stat(filepath.Join(backup, "keep-session.jsonl")); err != nil {
+		t.Fatalf("user data was removed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(backup, ".DS_Store")); !os.IsNotExist(err) {
+		t.Fatalf(".DS_Store was not removed: %v", err)
+	}
+	if _, err := os.Stat(metadataDir); !os.IsNotExist(err) {
+		t.Fatalf("empty metadata-only directory remains: %v", err)
+	}
+}
+
+func TestFinderMetadataOnlyBackupCanBeCleaned(t *testing.T) {
+	root := t.TempDir()
+	backup := filepath.Join(root, ".antmove-backup-test")
+	if err := os.MkdirAll(filepath.Join(backup, "sessions"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(backup, "sessions", ".DS_Store"), []byte("finder"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	op := Operation{Name: "test backup", SourcePath: filepath.Join(root, "assistant-data"), Category: CategoryAIData}
+	if err := removeVerifiedBackup(op, backup, filepath.Join(root, "destination"), false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(backup); !os.IsNotExist(err) {
+		t.Fatalf("metadata-only backup still exists: %v", err)
+	}
+}
+
+func TestDittoCopyProgressReportsCopiedBytes(t *testing.T) {
+	root := t.TempDir()
+	source, destination := filepath.Join(root, "source"), filepath.Join(root, "destination")
+	if err := os.Mkdir(source, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := make([]byte, 256*1024)
+	if err := os.WriteFile(filepath.Join(source, "large file.bin"), content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var reported int64
+	if _, err := dittoCopyProgress(source, destination, false, func(value int64) { reported = value }); err != nil {
+		t.Fatal(err)
+	}
+	if reported != int64(len(content)) {
+		t.Fatalf("progress reported %d bytes, want %d", reported, len(content))
+	}
+}
+
+func TestRefreshItemAfterAppQuitUpdatesSnapshot(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "assistant-data")
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(path, "final-session.jsonl"), []byte("saved on quit"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	refreshed, err := refreshItemAfterAppQuit(Item{Category: CategoryAIData, SourcePath: path, SourceFingerprint: "stale"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refreshed.SourceFingerprint == "stale" || refreshed.SourceFingerprint == "" {
+		t.Fatalf("source fingerprint was not refreshed: %q", refreshed.SourceFingerprint)
+	}
+	if refreshed.SizeBytes <= 0 {
+		t.Fatalf("size after app quit = %d, want positive", refreshed.SizeBytes)
+	}
+}
+
+func TestAIProcessUseOfCandidateDataFolder(t *testing.T) {
+	if !processUsesDataFolder("/Users/test/.hermes/node/bin/node", "/Users/test/.hermes") {
+		t.Error("process executable inside assistant data folder was not associated")
+	}
+	if processUsesDataFolder("/Users/test/.hermes-backup/node", "/Users/test/.hermes") {
+		t.Error("sibling folder was incorrectly associated")
+	}
+}
+
+func TestOperationErrorsUseDedicatedResultPage(t *testing.T) {
+	model := tuiModel{page: "moving", busy: true, loading: true}
+	updated, _ := model.Update(operationMsg{message: "FAILED before moving files: ChatGPT is still active", failed: true})
+	result := updated.(tuiModel)
+	if result.page != "operation-result" {
+		t.Fatalf("error page = %q, want operation-result", result.page)
+	}
+	if result.resultTitle != "Operation failed" || result.returnPage != "items" {
+		t.Fatalf("error result title/return page = %q/%q", result.resultTitle, result.returnPage)
+	}
+	if len(result.resultLines) != 1 || !strings.Contains(result.resultLines[0], "ChatGPT is still active") {
+		t.Fatalf("error details = %#v", result.resultLines)
 	}
 }
 
@@ -314,6 +621,15 @@ func TestTUIViewWrapsLongDiskRowsToTerminalWidth(t *testing.T) {
 	}
 	if !strings.Contains(strings.ReplaceAll(wrapped, "\n", " "), "free 613.5 GB") {
 		t.Fatalf("wrapped output lost the disk free-space details: %q", wrapped)
+	}
+}
+
+func TestDiskSuitabilityColorContinuesOnWrappedLine(t *testing.T) {
+	view := "External disks · Choose a destination\n    Games: Excellent for games · Apps: Excellent for applications · Messengers: Excellent for\n    messengers\n"
+	styled := styleTerminalView(view, "disks", nil, 0, 0)
+	continuation := "    messengers"
+	if !strings.Contains(styled, tuiSuccessStyle.Render(continuation)) {
+		t.Fatalf("wrapped suitability continuation is not green: %q", styled)
 	}
 }
 

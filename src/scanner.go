@@ -47,6 +47,7 @@ func scanItems() ([]Item, error) {
 	apps := scanApplications(home, items, bySource)
 	associated := scanAssociatedAppData(home, apps, items, bySource)
 	scanDeveloperData(home, items, bySource)
+	scanAIAssistantData(home, items, bySource)
 	scanAppleMediaData(home, associated, items, bySource)
 	scanUnassignedData(home, associated, items, bySource)
 	scanContainerStorage(home, items)
@@ -77,6 +78,67 @@ func scanItems() ([]Item, error) {
 	}
 	sortItems(result)
 	return result, nil
+}
+
+// AI assistant state often contains conversation history, local indexes, and
+// project context. Inspect direct children of the home and .config directories
+// so a broad name heuristic cannot turn unrelated nested folders into candidates.
+func scanAIAssistantData(home string, items map[string]Item, bySource map[string]Operation) {
+	roots := []string{
+		home,
+		filepath.Join(home, ".config"),
+		filepath.Join(home, ".local", "share"),
+		filepath.Join(home, ".local", "state"),
+		filepath.Join(home, "Library", "Application Support"),
+	}
+	for _, root := range roots {
+		if hasSymlinkAncestor(root) {
+			continue
+		}
+		entries, err := os.ReadDir(root)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			path := filepath.Join(root, entry.Name())
+			if hasSymlinkAncestor(path) || entry.Type()&fs.ModeSymlink != 0 || !entry.IsDir() || !isAIAssistantDirectory(entry.Name()) {
+				continue
+			}
+			if item, ok := makeItem(path, entry.Name(), CategoryAIData, "", bySource); ok {
+				item.Reason = "AI assistant data may contain conversation history, project context, and local indexes. Quit the assistant and finish any active sync or generation before moving. Review the folder contents before moving."
+				if item.RuntimeSockets > 0 {
+					item.Reason += fmt.Sprintf(" Found %d Unix socket runtime endpoint(s); inactive sockets will be omitted from the copy, while active sockets block the move.", item.RuntimeSockets)
+				}
+				items[path] = item
+			}
+		}
+	}
+}
+
+func isAIAssistantDirectory(name string) bool {
+	n := strings.ToLower(strings.TrimPrefix(name, "."))
+	n = strings.NewReplacer(" ", "-", "_", "-").Replace(n)
+	known := []string{
+		"codex", "agents", "claude", "claude-code", "cursor", "copilot", "github-copilot",
+		"kilocode", "kilo", "hermes", "roo", "roo-code", "cline", "continue", "aider",
+		"windsurf", "codeium", "gemini", "antigravity", "antigravity-ide", "qwen", "qwen-code",
+		"opencode", "open-code", "goose", "amp", "zed", "kiro", "amazonq", "junie",
+		"openclaw", "pi", "pi-coding-agent", "crush", "factory", "droid", "kimi", "trae",
+		"warp", "replit", "void", "sourcegraph-cody", "cody", "tabby", "ollama", "lm-studio",
+		"chatgpt", "openai", "jan", "anythingllm", "msty", "gpt4all", "perplexity",
+	}
+	for _, candidate := range known {
+		if n == candidate || strings.HasPrefix(n, candidate+"-") || strings.HasPrefix(n, candidate+".") {
+			return true
+		}
+	}
+	// Catch common product variants without matching generic dotfolders.
+	for _, marker := range []string{"copilot", "codex", "assistant", "claude", "llm", "kilocode", "hermes", "aider", "opencode", "antigravity", "qwen", "gemini", "openclaw", "windsurf", "cursor", "cline", "junie", "kiro"} {
+		if strings.Contains(n, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func scanAppleMediaData(home string, associated map[string]bool, items map[string]Item, bySource map[string]Operation) {
@@ -542,8 +604,11 @@ func makeItemAtLeast(path, name string, category Category, owner string, bySourc
 		knownSize = true
 	}
 	if !knownSize {
-		if size, err := allocatedSize(measurePath); err == nil {
+		if size, sockets, err := allocatedSizeWithRuntimeSockets(measurePath); err == nil {
 			item.SizeBytes = size
+			if category == CategoryAIData {
+				item.RuntimeSockets = sockets
+			}
 		} else {
 			item.Status = StatusUnavailable
 			item.Reason = "Could not measure candidate contents: " + err.Error()
@@ -553,7 +618,13 @@ func makeItemAtLeast(path, name string, category Category, owner string, bySourc
 }
 
 func allocatedSize(root string) (int64, error) {
+	size, _, err := allocatedSizeWithRuntimeSockets(root)
+	return size, err
+}
+
+func allocatedSizeWithRuntimeSockets(root string) (int64, int, error) {
 	var total int64
+	sockets := 0
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -573,9 +644,12 @@ func allocatedSize(root string) (int64, error) {
 		} else if info.Mode().IsRegular() {
 			total += info.Size()
 		}
+		if info.Mode()&fs.ModeSocket != 0 {
+			sockets++
+		}
 		return nil
 	})
-	return total, err
+	return total, sockets, err
 }
 
 func allocatedSizeAtLeast(root string, minimum int64) (int64, bool, error) {

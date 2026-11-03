@@ -3,7 +3,7 @@
 > 🐜 A macOS terminal tool to move apps and data to external drives—and keep them running like before.
 
 Repository: https://github.com/MakStashkevich/antmove
-Version: 0.1.3
+Version: 0.1.4
 License: MIT
 Platform: macOS 15+, Apple Silicon arm64 and Intel amd64
 Interface language: English
@@ -33,8 +33,10 @@ Run `am --version` to confirm installation. If the command is unavailable, reope
 - Caution-rated disks require two separate confirmations in the CLI. Read-only, network, system, and unavailable disks are not valid destinations.
 - Keep all destination disks connected while their moved data is in use.
 - Apple Photos/Music/TV and iPhone/iPad backups have app-specific requirements. macOS may require Full Disk Access for the terminal. Apple TV downloads may use DRM.
+- `am scan` also lists recognized AI assistant data folders in the home directory, including `.codex`, `.agents`, `.claude`, `.copilot`, `.gemini`, `.qwen`, `.antigravity`, `.kilocode`, `.hermes`, `.config/opencode`, and known app support folders. They may contain conversation history and project context; ask the user to close the assistant and finish sync/generation before moving, and review contents first. For Unix sockets, verify no process has them open; Antmove omits inactive runtime sockets from the destination and blocks on active ones.
+- Interactive moves show copied bytes, percentage, bytes remaining, and an approximate ETA. Before deleting an original backup after linking, compare its remaining data with the destination. Cleanup may remove Finder metadata files named `.DS_Store` and `._*`; preserve other mismatched data and keep the operation in `cleanup_pending`.
 - `am scan` lists supported standard Apple media and backup folders even when empty (`0 B`) or not yet created. A confirmed move creates the missing source folder and links it to the selected disk so later writes at that path can be stored externally. Quit the related app and finish backups/sync first. New Photos libraries are app-managed packages; use Photos' Option-open → Create New flow and heed Antmove's item note if Photos cannot initialize an empty linked location.
-- If an associated GUI app is active, the interactive move flow asks separately before sending a graceful quit request. The CLI equivalent is `--close-apps`; macOS may ask the requesting terminal app for Automation permission. Antmove never force-quits or discards unsaved work and never stops backup, sync, or container services.
+- If an associated GUI app is active, the interactive move flow asks separately before sending a graceful quit request. The CLI equivalent is `--close-apps`; macOS may ask the requesting terminal app for Automation permission. For AI assistant data only, after separate confirmation and once the main app exits gracefully, Antmove force-quits verified helper processes left inside that app bundle. It never force-quits the main app, discards unsaved work, or stops backup, sync, or container services.
 - On current macOS, Apple Music is the music app; show legacy iTunes paths only when those folders already exist. Do not suggest installing or using iTunes on a current Mac.
 - For Apple TV, read the configured Media folder from `TV > Settings > Files` (`~/Movies/TV/Media.localized` is the default on this Mac). Apple does not document a stable filesystem path for DRM-protected downloads, so list known app-managed download paths only when they exist; never show missing cache paths as empty future folders.
 - Antmove provides vendor guidance for Docker Desktop, OrbStack, Colima, and Rancher Desktop. It does not directly move their VM/database stores.

@@ -31,6 +31,8 @@ macOSもアプリも、前から使っていたパスをそのまま使います
 - macOSが許可すれば、Photosライブラリ、Apple Musicのメディア、存在する旧iTunesフォルダ、Apple TVのメディア/ダウンロード、iPhone/iPadバックアップ。
 - 昔のExtender移行記録。
 
+antmoveはユーザーデータの標準的な場所にあるAIアシスタントのデータも表示します。<code>.codex</code>、<code>.agents</code>、<code>.claude</code>、<code>.copilot</code>、<code>.gemini</code>、<code>.qwen</code>、<code>.antigravity</code>、<code>.kilocode</code>、<code>.hermes</code>、<code>.config/opencode</code>や、既知のアプリ用フォルダが対象です。会話履歴やプロジェクトのコンテキストが含まれることがあります。移動前にアシスタントを終了し、同期や生成が終わったことを確認して、フォルダの中身を確認してください。移動できないUnixソケットは、使用中のプロセスがない場合に限りコピー対象から除外します。使用中なら移動を中止します。
+
 Docker Desktop、OrbStack、Colima、Rancher Desktopのストレージも、メーカーの案内つきで表示されます。でも、antmoveはエンジンの中身を直接移しません。VMやデータベースを普通のフォルダのように動かすと、壊れることがあるからです。
 
 どのアプリのデータか確信できない大きなフォルダは、勝手に決めつけず、そのまま表示します。
@@ -165,7 +167,7 @@ am disks --test "/Volumes/Work SSD"
 4. メニューの **Move data** を選び、項目とディスクを指定し、警告を読んで確認。
 5. 移したデータを使う間はディスクを接続しておく。
 
-関連アプリが起動中なら、対話メニューで通常終了要求を送るか個別に確認します。CLIでは<code>--close-apps</code>を使えます。macOSがTerminalにAutomation権限を求める場合があります。強制終了やコンテナエンジン/バックグラウンドサービスの停止はしません。
+関連アプリが起動中なら、対話メニューで通常終了要求を送るか個別に確認します。CLIでは<code>--close-apps</code>を使えます。macOSがTerminalにAutomation権限を求める場合があります。AIアシスタントのデータ移動では、個別確認後にメインアプリが通常終了すると、同じアプリバンドル内に残った検証済みヘルパーだけを強制終了します。コンテナエンジンや他のバックグラウンドサービスは停止しません。
 
 <code>am scan</code>のIDでプレビューできます。
 
@@ -189,13 +191,15 @@ am move --disk "/Volumes/Shared" --confirm-caution --confirm-caution 71a29f5a1cd
 
 antmoveは空き容量を確認し、macOSの<code>ditto</code>で一時フォルダにコピーし、ハッシュとフォルダ内容を比べます。確認してから元のパスをシンボリックリンクに置き換えます。操作記録は<code>~/Library/Application Support/antmove</code>です。
 
+転送中はコピー済み容量、進捗率、残り容量、残り時間の目安を表示します。バックアップの整理ではFinderのメタデータファイル<code>.DS_Store</code>と<code>._*</code>を削除し、残りのデータを保存先と照合します。変更されたデータは保持してエラーを表示します。
+
 ## 写真、音楽、映画、バックアップのこと
 
 - **Photos:** <code>.photoslibrary</code>を移す前にPhotosを終了。AppleはAPFSまたはMac OS Extendedを推奨しています。移動後は新しい場所から開き、iCloud Photosなら必要に応じてシステムフォトライブラリに指定してください。
 - **Music:** Musicを終了してから移動。今後の読み込み先は **Music → Settings → Files → Media Location** で確認してください。antmoveはMusicの設定を変えません。
 - **Apple TV:** TVを終了。ダウンロードした映画にはDRMがあることがあります。移動後に再生を確認し、見るときはディスクを接続してください。
 - **Apple TVの場所:** <code>TV → Settings → Files</code>で設定されたMedia folderを使用します。既定値は<code>~/Movies/TV/Media.localized</code>です。親フォルダ全体は移動しません。ダウンロード用キャッシュの安定した場所はAppleが公開していないため、実在する場合のみ表示します。
-- **アプリの終了:** 関連アプリが起動中なら、移動前に通常の終了要求を送るか個別に確認します。CLIでは<code>--close-apps</code>を指定します。macOSがTerminalにAutomation権限を求める場合があります。強制終了、未保存データの破棄、バックアップ/同期/コンテナサービスの停止はしません。
+- **アプリの終了:** 関連アプリが起動中なら、移動前に通常の終了要求を送るか個別に確認します。CLIでは<code>--close-apps</code>を指定します。macOSがTerminalにAutomation権限を求める場合があります。AIアシスタントのデータ移動に限り、個別確認後にメインアプリが通常終了した場合、同じアプリバンドル内に残った検証済みヘルパープロセスを強制終了します。メインアプリ、未保存データ、バックアップ/同期/コンテナサービスは強制終了しません。
 - **iPhone/iPadバックアップ:** 標準の場所は<code>~/Library/Application Support/MobileSync/Backup</code>です。Finderのバックアップや同期が終わってから移動。アクセス拒否なら、<code>am</code>を動かすTerminalなどにFull Disk Accessを付け、開き直して再スキャンしてください。
 - **空または未作成のフォルダ:** <code>am scan</code>はMusic、Photos、Apple TV、iPhone/iPadバックアップの標準パスを、空でも未作成でも表示します。<code>0 B</code>の項目も移動できます。確認後、antmoveが必要なら元のフォルダを作り、外部ディスクへのリンクを置きます。そのパスへの今後の書き込みは外部ディスクに保存されます。先に関連アプリを終了し、バックアップや同期が完了していることを確認してください。MusicのMedia Locationがリンク先を指しているか確認しましょう。Photosライブラリは管理されたパッケージです。新規作成はPhotosをOptionキーを押しながら起動し、「Create New」から行ってください。空のリンクから作れない場合は、外部ディスクに直接作成してPhotosで選択してください。旧iTunesのパスは、対応するフォルダが実在するときだけ表示します。
 - **Docker:** エンジンが用意している方法を使ってください。VMやデータベースのファイルを普通のフォルダのように動かすのはやめたほうがいいです。

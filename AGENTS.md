@@ -43,9 +43,11 @@ Keep a behavior change in its owning file. Avoid expanding the CLI surface when 
 1. Scanning, status, disk listing, and dry-run are read-only. Prefer them before any operation that changes files.
 2. A real move or restore requires the user's explicit request. Show or run a dry-run first, explain the paths, disk, size, and material warning, then wait for approval.
 3. A caution-rated disk requires two separate confirmations. Never suggest that double confirmation makes an unsuitable disk recommended.
-4. Never close an app unless the user separately confirms that Antmove may send it a graceful quit request. Let macOS request Automation permission; if denied, stop without moving files. Never force-quit, discard unsaved work, or terminate Docker/container engines, backup, sync, or other background services.
-5. Copy with macOS ditto to a staging path, verify content, then create the original-path symlink. Keep journal phases and recovery behavior consistent with the transfer state machine.
+4. Never close an app unless the user separately confirms that Antmove may send it a graceful quit request. Let macOS request Automation permission; if denied, stop without moving files. For AI assistant data only, after the confirmed graceful quit and only once the main app has exited, Antmove may force-terminate helper processes verified to belong to that app bundle. Never force-quit the main app, discard unsaved work, or terminate Docker/container engines, backup, sync, or unrelated background services.
+5. Copy with macOS ditto to a staging path, verify content, then create the original-path symlink. For AI data, verify Unix sockets have no open owners; temporarily move only inactive socket entries aside during copy, omit them from the destination as non-portable runtime endpoints, and restore them to the source on every failure. Never skip an active socket. Keep journal phases and recovery behavior consistent with the transfer state machine.
 6. Do not remove the original data before verification. On failure, restore the source path or leave a clear recovery-required journal entry.
+   Before deleting an original backup after linking, compare it with the destination again. If they differ or cleanup fails, preserve the backup and keep the operation in `cleanup_pending`; recovery must never ignore a cleanup error or mark the operation complete while the backup remains.
+   Finder metadata files named `.DS_Store` and `._*` may be removed from the backup during cleanup; do not remove any other mismatched entry.
 7. Preserve spaces, Unicode, and symlink semantics in paths. Quote every path passed to an external command.
 8. Do not treat Docker Desktop, OrbStack, Colima, or Rancher Desktop engine stores as ordinary folders. Show supported vendor guidance instead.
 9. Apple TV downloads may be DRM protected; Photos, Music, TV and device backups need app-specific warnings. Do not alter app preferences unless the feature explicitly supports that workflow.
@@ -56,6 +58,7 @@ Keep a behavior change in its owning file. Avoid expanding the CLI surface when 
 - Format Go changes with gofmt.
 - Run the focused Go tests for behavior changes and the full <code>make test</code> before a release.
 - Run <code>make check</code> for formatting, vet, and tests.
+- Interactive moves should report copied bytes, percentage, remaining bytes, and an approximate ETA while copying.
 - Build both release architectures with <code>make release</code> or <code>./build.sh</code>.
 - Keep the Homebrew formula version, source URL, and SHA-256 aligned with the release source commit.
 - Do not claim a release is published unless a GitHub release exists and its assets are verified.

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 var antLogoFacingLeft = []string{
@@ -196,6 +197,24 @@ func formatBytes(value int64) string {
 		return fmt.Sprintf("%d B", value)
 	}
 	return fmt.Sprintf("%.1f %s", size, units[unit])
+}
+
+func approximateDuration(value time.Duration) string {
+	if value < 0 {
+		value = 0
+	}
+	seconds := int(value.Round(time.Second).Seconds())
+	if seconds < 60 {
+		return fmt.Sprintf("%ds", seconds)
+	}
+	minutes := seconds / 60
+	seconds %= 60
+	if minutes < 60 {
+		return fmt.Sprintf("%dm %02ds", minutes, seconds)
+	}
+	hours := minutes / 60
+	minutes %= 60
+	return fmt.Sprintf("%dh %02dm", hours, minutes)
 }
 
 func truncate(value string, max int) string {

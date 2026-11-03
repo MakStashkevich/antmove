@@ -33,11 +33,15 @@ Do not infer ownership from a folder name alone. Items marked unassigned need th
 5. Wait for an explicit approval of that plan before running a real move.
 6. For a caution-rated disk, antmove requires two separate confirmations. Do not bypass or emulate these confirmations.
 
-Never close an app or engine automatically. If Antmove reports related activity, ask the user to close the app or finish the backup/sync, then rescan.
+Never close the main app unless the user separately confirms a graceful quit request. For AI assistant data only, after that confirmed quit and once the app has exited, Antmove may force-terminate helper processes verified to belong to the same app bundle. Never terminate a CLI in a terminal, backup/sync, container engine, or unrelated service.
+
+Interactive moves show copied bytes, percentage, bytes remaining, and an approximate ETA. Before deleting an original backup after linking, compare its remaining data with the destination. `.DS_Store` and `._*` Finder metadata files may be removed from the backup; preserve any other mismatched data and keep the operation in `cleanup_pending`. Recovery must not ignore cleanup errors or mark the operation complete while a backup remains.
 
 A real non-interactive transfer to a recommended disk uses <code>am move --disk PATH --yes ID</code>. Only run it after approval. Do not combine a caution disk with an automatic confirmation.
 
 ## Apple data
+
+- `am scan` also lists recognized AI assistant data folders directly inside the home directory, including `.codex`, `.agents`, `.claude`, `.copilot`, `.gemini`, `.qwen`, `.antigravity`, `.kilocode`, `.hermes`, `.config/opencode`, and known app support folders, plus other recognized assistant names. These may contain conversation history and project context. Runtime Unix sockets are non-portable: verify that none are active, temporarily set inactive sockets aside for copying, omit them from the destination, and restore them to the source if a transfer fails. Never skip an active socket. Ask the user to close the assistant and finish sync/generation before moving; review the folder first.
 
 - Photos: ask the user to quit Photos; libraries should use APFS or Mac OS Extended. After moving, the user may need to open the library from the new location and set it as the System Photo Library.
 - Music: quit Music first. Antmove does not edit Music preferences; the user should review its Media Location setting.

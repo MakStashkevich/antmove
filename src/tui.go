@@ -5,6 +5,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -14,41 +15,42 @@ import (
 )
 
 type tuiModel struct {
-	page            string
-	items           []Item
-	operations      []Operation
-	volumes         []Volume
-	selectedItems   map[string]bool
-	selectedOps     map[string]bool
-	cursor          int
-	volumeCursor    int
-	confirmStage    int
-	confirmText     string
-	closeActivities []activeActivity
-	pendingVolume   Volume
-	closeCanProceed bool
-	search          string
-	searching       bool
-	busy            bool
-	loading         bool
-	loaded          bool
-	spinner         int
-	dryRun          bool
-	message         string
-	resultTitle     string
-	resultLines     []string
-	menuCursor      int
-	width           int
-	height          int
-	returnPage      string
-	quitAction      string
-	antOffset       int
-	antDirection    int
-	antPause        int
-	antWiggle       int
-	antWalkFrame    int
-	antHasBall      bool
-	antBallDrop     int
+	page             string
+	items            []Item
+	operations       []Operation
+	volumes          []Volume
+	selectedItems    map[string]bool
+	selectedOps      map[string]bool
+	cursor           int
+	volumeCursor     int
+	confirmStage     int
+	confirmText      string
+	closeActivities  []activeActivity
+	pendingVolume    Volume
+	closeCanProceed  bool
+	search           string
+	searching        bool
+	busy             bool
+	loading          bool
+	loaded           bool
+	spinner          int
+	transferProgress transferProgress
+	dryRun           bool
+	message          string
+	resultTitle      string
+	resultLines      []string
+	menuCursor       int
+	width            int
+	height           int
+	returnPage       string
+	quitAction       string
+	antOffset        int
+	antDirection     int
+	antPause         int
+	antWiggle        int
+	antWalkFrame     int
+	antHasBall       bool
+	antBallDrop      int
 }
 
 type refreshMsg struct {
@@ -63,11 +65,36 @@ type operationMsg struct {
 	page             string
 	resultTitle      string
 	returnPage       string
+	failed           bool
 	operationUpdates []Operation
 	candidateUpdates []Item
 }
 
 type tickMsg time.Time
+
+type transferProgress struct {
+	Name       string
+	DoneBytes  int64
+	TotalBytes int64
+	StartedAt  time.Time
+}
+
+var transferProgressState struct {
+	sync.RWMutex
+	value transferProgress
+}
+
+func setTransferProgress(progress transferProgress) {
+	transferProgressState.Lock()
+	transferProgressState.value = progress
+	transferProgressState.Unlock()
+}
+
+func getTransferProgress() transferProgress {
+	transferProgressState.RLock()
+	defer transferProgressState.RUnlock()
+	return transferProgressState.value
+}
 
 const maxAntTravelOffset = 20
 
@@ -136,7 +163,7 @@ func (m tuiModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		m.loaded = true
 		if msg.err != nil {
-			m.message = msg.err.Error()
+			m.showErrorResult(msg.err.Error(), m.page)
 			return m, nil
 		}
 		m.items, m.operations, m.volumes = msg.items, msg.operations, msg.volumes
@@ -160,6 +187,18 @@ func (m tuiModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.items = applyCachedItemUpdates(m.items, msg.candidateUpdates)
 			return m, nil
 		}
+		if msg.failed {
+			returnPage := msg.page
+			if returnPage == "" {
+				returnPage = map[string]string{"moving": "items", "restoring": "restore"}[m.page]
+			}
+			if returnPage == "" {
+				returnPage = m.page
+			}
+			m.showErrorResult(msg.message, returnPage)
+			m.busy, m.loading = false, false
+			return m, nil
+		}
 		m.message = msg.message
 		m.busy = false
 		if msg.page != "" {
@@ -180,6 +219,9 @@ func (m tuiModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tickCommand()
 		}
 		if m.busy || m.loading {
+			if m.page == "moving" {
+				m.transferProgress = getTransferProgress()
+			}
 			m.spinner = (m.spinner + 1) % 4
 			return m, tickCommand()
 		}
@@ -326,7 +368,7 @@ func (m tuiModel) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, tea.Batch(tickCommand(), func() tea.Msg {
 					result, err := testVolume(path)
 					if err != nil {
-						return operationMsg{message: "Speed test failed: " + err.Error(), page: "disks"}
+						return operationMsg{message: "Speed test failed: " + err.Error(), page: "disks", failed: true}
 					}
 					return operationMsg{message: fmt.Sprintf("Speed test complete: read %.0f MB/s, write %.0f MB/s", result.ReadMBps, result.WriteMBps), page: "disks"}
 				})
@@ -421,12 +463,12 @@ func (m tuiModel) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(tickCommand(), func() tea.Msg {
 				unlock, err := acquireLock()
 				if err != nil {
-					return operationMsg{message: err.Error(), page: returnPage}
+					return operationMsg{message: err.Error(), page: returnPage, failed: true}
 				}
 				defer unlock()
 				results, err := recoverOperations()
 				if err != nil {
-					return operationMsg{message: "Recovery failed: " + err.Error(), page: returnPage}
+					return operationMsg{message: "Recovery failed: " + err.Error(), page: returnPage, failed: true}
 				}
 				operations, loadErr := loadOperations()
 				if loadErr != nil {
@@ -435,7 +477,8 @@ func (m tuiModel) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if len(results) == 0 {
 					return operationMsg{message: "No interrupted operations need recovery.", page: returnPage, operationUpdates: operations}
 				}
-				return operationMsg{message: strings.Join(results, "\n"), page: returnPage, operationUpdates: operations}
+				return operationMsg{message: strings.Join(results, "\n"), page: "operation-result",
+					resultTitle: operationResultTitle("Recovery", results), returnPage: returnPage, operationUpdates: operations}
 			})
 		case "n", "esc":
 			m.page, m.message = nonempty(m.returnPage, "status"), "Recovery cancelled."
@@ -450,6 +493,15 @@ func (m tuiModel) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	return m, nil
+}
+
+func (m *tuiModel) showErrorResult(message, returnPage string) {
+	m.page = "operation-result"
+	m.resultTitle = "Operation failed"
+	m.resultLines = strings.Split(message, "\n")
+	m.returnPage = nonempty(returnPage, "home")
+	m.message, m.busy, m.loading = "", false, false
+	m.cursor = 0
 }
 
 // Bubble Tea receives characters from the terminal, not physical keycodes.
@@ -551,7 +603,7 @@ func (m tuiModel) activateHomeOption(option int) (tea.Model, tea.Cmd) {
 	case 6:
 		installed, pathChanged, err := installSelf()
 		if err != nil {
-			m.message = "Install failed: " + err.Error()
+			m.showErrorResult("Install failed: "+err.Error(), "home")
 		} else if installed {
 			m.message = "Installed antmove and am in " + installDirectoryLabel()
 		} else {
@@ -585,7 +637,7 @@ func (m tuiModel) updateUninstallConfirmation(msg tea.KeyMsg) (tea.Model, tea.Cm
 	m.message = "Removing antmove and its state."
 	return m, tea.Batch(tickCommand(), func() tea.Msg {
 		if err := performUninstall(); err != nil {
-			return operationMsg{message: "Uninstall failed: " + err.Error(), page: "home"}
+			return operationMsg{message: "Uninstall failed: " + err.Error(), page: "home", failed: true}
 		}
 		return operationMsg{message: "antmove and its data were removed. Press any key to exit.", page: "uninstalled"}
 	})
@@ -681,25 +733,46 @@ func (m tuiModel) startMove(volume Volume, closeApps bool) (tea.Model, tea.Cmd) 
 	}
 	m.busy, m.page = true, "moving"
 	m.message = "Preparing transfer…"
+	totalBytes := int64(0)
+	for _, item := range items {
+		totalBytes += item.SizeBytes
+	}
+	setTransferProgress(transferProgress{TotalBytes: totalBytes, StartedAt: time.Now()})
+	m.transferProgress = getTransferProgress()
 	dryRun := m.dryRun
 	return m, tea.Batch(tickCommand(), func() tea.Msg {
 		if !dryRun {
 			unlock, err := acquireLock()
 			if err != nil {
-				return operationMsg{message: err.Error()}
+				return operationMsg{message: err.Error(), failed: true}
 			}
 			defer unlock()
 		}
 		if closeApps && !dryRun {
 			if err := closeAppsForItems(items); err != nil {
-				return operationMsg{message: "FAILED before moving files: " + err.Error()}
+				return operationMsg{message: "FAILED before moving files: " + err.Error(), failed: true}
+			}
+			for i := range items {
+				refreshed, err := refreshItemAfterAppQuit(items[i])
+				if err != nil {
+					return operationMsg{message: "FAILED before moving files: could not refresh " + items[i].Name + " after closing its app: " + err.Error(), failed: true}
+				}
+				items[i] = refreshed
 			}
 		}
+		setTransferProgress(transferProgress{TotalBytes: totalBytes, StartedAt: time.Now()})
 		var lines []string
 		operationUpdates := make([]Operation, 0, len(items))
 		candidateUpdates := make([]Item, 0, len(items))
+		completedBytes := int64(0)
 		for _, item := range items {
-			op, err := moveItem(item, volume, dryRun)
+			setTransferProgress(transferProgress{Name: item.Name, DoneBytes: completedBytes, TotalBytes: totalBytes, StartedAt: getTransferProgress().StartedAt})
+			op, err := moveItemWithProgress(item, volume, dryRun, func(copied int64) {
+				if copied > item.SizeBytes && item.SizeBytes > 0 {
+					copied = item.SizeBytes
+				}
+				setTransferProgress(transferProgress{Name: item.Name, DoneBytes: completedBytes + copied, TotalBytes: totalBytes, StartedAt: getTransferProgress().StartedAt})
+			})
 			if err != nil {
 				lines = append(lines, "FAILED "+item.Name+": "+err.Error())
 				if op.ID != "" {
@@ -712,11 +785,24 @@ func (m tuiModel) startMove(volume Volume, closeApps bool) (tea.Model, tea.Cmd) 
 				lines = append(lines, "PREVIEW "+item.Name+" → "+op.DestinationPath)
 			} else {
 				lines = append(lines, "MOVED "+item.Name+" → "+op.DestinationPath)
+				if op.Warning != "" {
+					lines[len(lines)-1] += " (" + op.Warning + ")"
+				}
 				operationUpdates = append(operationUpdates, op)
 				candidateUpdates = append(candidateUpdates, movedCandidate(item, op))
 			}
+			if err == nil {
+				completedBytes += item.SizeBytes
+				setTransferProgress(transferProgress{Name: item.Name, DoneBytes: completedBytes, TotalBytes: totalBytes, StartedAt: getTransferProgress().StartedAt})
+			}
 		}
 		if dryRun {
+			for _, line := range lines {
+				if strings.HasPrefix(line, "FAILED ") {
+					return operationMsg{message: strings.Join(lines, "\n"), page: "operation-result",
+						resultTitle: operationResultTitle("Move preview", lines), returnPage: "items"}
+				}
+			}
 			return operationMsg{message: strings.Join(lines, "\n")}
 		}
 		return operationMsg{message: strings.Join(lines, "\n"), page: "operation-result",
@@ -732,7 +818,7 @@ func (m tuiModel) startRestore() (tea.Model, tea.Cmd) {
 	return m, tea.Batch(tickCommand(), func() tea.Msg {
 		unlock, err := acquireLock()
 		if err != nil {
-			return operationMsg{message: err.Error()}
+			return operationMsg{message: err.Error(), failed: true}
 		}
 		defer unlock()
 		var results []string
@@ -850,7 +936,7 @@ func applyCachedItemUpdates(current, updates []Item) []Item {
 
 func operationResultTitle(operation string, lines []string) string {
 	for _, line := range lines {
-		if strings.HasPrefix(line, "FAILED ") {
+		if strings.HasPrefix(line, "FAILED ") || strings.HasPrefix(line, "WARNING:") || strings.HasPrefix(line, "Could not ") {
 			return operation + " finished with errors"
 		}
 	}
@@ -1090,7 +1176,14 @@ func (m tuiModel) View() string {
 				b.WriteString("    · " + activity.Name + "\n")
 			}
 			b.WriteString("\n  Apps can change files during a move and make verification fail.\n")
-			b.WriteString("  Antmove will not force-quit or discard unsaved work.\n")
+			forceHelpers := false
+			for _, activity := range m.closeActivities {
+				forceHelpers = forceHelpers || activity.ForceHelpers
+			}
+			if forceHelpers {
+				b.WriteString("  After the main AI app exits, Antmove will force-quit verified helper processes left in its app bundle.\n")
+			}
+			b.WriteString("  Antmove will not force-quit the main app or discard unsaved work.\n")
 			b.WriteString("  macOS may ask permission to control these apps under Automation.\n")
 			b.WriteString("  Allow only if you want antmove to send the quit request.\n")
 		} else {
@@ -1112,7 +1205,27 @@ func (m tuiModel) View() string {
 		if m.page == "restoring" {
 			activity = "Restoring selected data…"
 		}
-		b.WriteString(fmt.Sprintf("\n  %s %s\n\n  Do not disconnect the destination disk.\n", spinnerFrame(m.spinner), activity))
+		b.WriteString(fmt.Sprintf("\n  %s %s\n", spinnerFrame(m.spinner), activity))
+		if m.page == "moving" && m.transferProgress.TotalBytes > 0 {
+			progress := m.transferProgress
+			done := progress.DoneBytes
+			if done > progress.TotalBytes {
+				done = progress.TotalBytes
+			}
+			percent := done * 100 / progress.TotalBytes
+			remaining := progress.TotalBytes - done
+			eta := "estimating…"
+			elapsed := time.Since(progress.StartedAt).Seconds()
+			if elapsed >= 1 && done > 0 {
+				seconds := time.Duration(float64(remaining) / (float64(done) / elapsed) * float64(time.Second))
+				eta = approximateDuration(seconds)
+			}
+			b.WriteString(fmt.Sprintf("\n  %d%% · %s / %s · %s left · ~%s\n", percent, formatBytes(done), formatBytes(progress.TotalBytes), formatBytes(remaining), eta))
+			if progress.Name != "" {
+				b.WriteString("  Current: " + progress.Name + "\n")
+			}
+		}
+		b.WriteString("\n  Do not disconnect the destination disk.\n")
 	case "restore":
 		if m.loaded {
 			b.WriteString(fmt.Sprintf("\n  Restore · %d available · %d selected\n\n", len(m.restorableOperations()), len(m.selectedOps)))
@@ -1167,6 +1280,9 @@ func (m tuiModel) View() string {
 			if op.Error != "" && i == m.cursor {
 				b.WriteString("    " + op.Error + "\n")
 			}
+			if op.Warning != "" && i == m.cursor {
+				b.WriteString("    Note: " + op.Warning + "\n")
+			}
 		}
 	case "recover-confirm":
 		if m.busy {
@@ -1207,7 +1323,20 @@ func styleTerminalView(view, page string, logo []string, antOffset, textStart in
 		}
 	}
 	headingPending := false
+	diskSuitabilityContinuation := false
 	for i, line := range lines {
+		if page == "disks" {
+			if strings.Contains(line, "Games:") {
+				lines[i] = tuiSuccessStyle.Render(line)
+				diskSuitabilityContinuation = true
+				continue
+			}
+			if diskSuitabilityContinuation && strings.HasPrefix(line, "    ") && !strings.Contains(line, "Warning:") {
+				lines[i] = tuiSuccessStyle.Render(line)
+				continue
+			}
+			diskSuitabilityContinuation = false
+		}
 		switch {
 		case i < len(logo):
 			lines[i] = styledAnimatedBrandHeaderLineFor(logo, i, antOffset, textStart)

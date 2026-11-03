@@ -2,7 +2,7 @@ package main
 
 import "time"
 
-var version = "0.1.3"
+var version = "0.1.4"
 
 type Category string
 
@@ -12,6 +12,7 @@ const (
 	CategoryAppleMedia  Category = "Apple media"
 	CategoryAppleBackup Category = "Apple device backup"
 	CategoryDeveloper   Category = "Developer data"
+	CategoryAIData      Category = "AI assistant data"
 	CategoryContainer   Category = "Container storage"
 )
 
@@ -34,6 +35,7 @@ type Item struct {
 	SizeBytes         int64      `json:"size_bytes"`
 	Status            ItemStatus `json:"status"`
 	Reason            string     `json:"reason,omitempty"`
+	RuntimeSockets    int        `json:"-"`
 	Owner             string     `json:"owner,omitempty"`
 	SourceFingerprint string     `json:"-"`
 	CreateWhenMissing bool       `json:"-"`
@@ -87,6 +89,7 @@ type Operation struct {
 	StagingPath             string    `json:"staging_path,omitempty"`
 	BackupPath              string    `json:"backup_path,omitempty"`
 	Error                   string    `json:"error,omitempty"`
+	Warning                 string    `json:"warning,omitempty"`
 }
 
 type DiskBenchmark struct {
